@@ -24,32 +24,73 @@ import { LegalPages } from './pages/LegalPages';
 import { LogoProvider } from './context/LogoContext';
 import { AdminLogoModal } from './components/AdminLogoModal';
 
+// Route extraction supporting direct URL path /admin and hash fallbacks
+const getRouteFromUrl = (): PageRoute => {
+  if (typeof window === 'undefined') return 'home';
+  const validRoutes: PageRoute[] = ['home', 'modules', 'hrdc-guide', 'gallery-about', 'contact-booking', 'admin', 'thank-you', 'privacy', 'terms'];
+  
+  // 1. Check pathname directly (e.g. /admin or /modules)
+  const pathPart = window.location.pathname.replace(/^\/+/, '').split('/')[0].toLowerCase() as PageRoute;
+  if (validRoutes.includes(pathPart)) {
+    return pathPart;
+  }
+
+  // 2. Check hash fallback (e.g. #/admin or #admin)
+  if (window.location.hash) {
+    const hashPart = window.location.hash.replace(/^#\/?/, '').split('?')[0].toLowerCase() as PageRoute;
+    if (validRoutes.includes(hashPart)) {
+      return hashPart;
+    }
+  }
+
+  return 'home';
+};
+
 export default function App() {
   // 1. Navigation State
-  const [currentRoute, setCurrentRoute] = useState<PageRoute>(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hash = window.location.hash.replace('#/', '').replace('#', '') as PageRoute;
-      const validRoutes: PageRoute[] = ['home', 'modules', 'hrdc-guide', 'gallery-about', 'contact-booking', 'admin', 'thank-you', 'privacy', 'terms'];
-      if (validRoutes.includes(hash)) return hash;
-    }
-    return 'home';
-  });
+  const [currentRoute, setCurrentRoute] = useState<PageRoute>(getRouteFromUrl);
 
-  // 2. Admin Authentication State
-  const [adminEmail, setAdminEmail] = useState<string>(() => {
+  // 2. Backend Admin Authentication State
+  const [adminToken, setAdminToken] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('clevera_admin_auth') || '';
+      return localStorage.getItem('clevera_admin_token') || '';
     }
     return '';
   });
 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const auth = localStorage.getItem('clevera_admin_auth');
-      return Boolean(auth && (auth === 'alifhakimi1704@gmail.com' || auth === 'alif@cleveraacademy.my' || auth === 'admin'));
+  const [adminUser, setAdminUser] = useState<{ username: string; role: string } | null>(null);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+
+  // Verify backend session token on initial mount
+  useEffect(() => {
+    const token = localStorage.getItem('clevera_admin_token');
+    if (!token) {
+      setIsAdminLoggedIn(false);
+      return;
     }
-    return false;
-  });
+
+    fetch('/api/admin/verify', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.valid && data.user) {
+          setIsAdminLoggedIn(true);
+          setAdminUser(data.user);
+          setAdminToken(token);
+        } else {
+          localStorage.removeItem('clevera_admin_token');
+          setIsAdminLoggedIn(false);
+          setAdminToken('');
+          setAdminUser(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend admin session check deferred:', err);
+      });
+  }, []);
 
   const [isLogoModalOpen, setIsLogoModalOpen] = useState<boolean>(false);
 
@@ -88,26 +129,29 @@ export default function App() {
   const [isEligibilityOpen, setIsEligibilityOpen] = useState(false);
   const [isMetaInspectorOpen, setIsMetaInspectorOpen] = useState(false);
 
-  // Sync route changes with window hash and scroll to top
+  // Sync route changes with window pathname/hash and scroll to top
   const handleNavigate = (route: PageRoute) => {
     setCurrentRoute(route);
     if (typeof window !== 'undefined') {
+      const newPath = route === 'home' ? '/' : `/${route}`;
+      window.history.pushState({ route }, '', newPath);
       window.location.hash = `#/${route}`;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  // Sync browser back/forward buttons
+  // Sync browser back/forward buttons (both popstate and hashchange)
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '').replace('#', '') as PageRoute;
-      const validRoutes: PageRoute[] = ['home', 'modules', 'hrdc-guide', 'gallery-about', 'contact-booking', 'admin', 'thank-you', 'privacy', 'terms'];
-      if (validRoutes.includes(hash)) {
-        setCurrentRoute(hash);
-      }
+    const handleUrlChange = () => {
+      const route = getRouteFromUrl();
+      setCurrentRoute(route);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
   }, []);
 
   // Update document title dynamically based on active route
@@ -154,19 +198,34 @@ export default function App() {
     }
   };
 
-  // Admin Auth Handlers
-  const handleAdminLogin = (email: string) => {
+  // Admin Backend Auth Handlers
+  const handleAdminLogin = (token: string, user: { username: string; role: string }) => {
     setIsAdminLoggedIn(true);
-    setAdminEmail(email);
+    setAdminToken(token);
+    setAdminUser(user);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('clevera_admin_auth', email);
+      localStorage.setItem('clevera_admin_token', token);
+      localStorage.removeItem('clevera_admin_auth');
     }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    const token = adminToken || (typeof window !== 'undefined' ? localStorage.getItem('clevera_admin_token') : null);
+    if (token) {
+      try {
+        await fetch('/api/admin/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        // ignore logout network errors
+      }
+    }
     setIsAdminLoggedIn(false);
-    setAdminEmail('');
+    setAdminToken('');
+    setAdminUser(null);
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('clevera_admin_token');
       localStorage.removeItem('clevera_admin_auth');
     }
     handleNavigate('home');
@@ -226,12 +285,14 @@ export default function App() {
             isAdminLoggedIn={isAdminLoggedIn}
             onLogin={handleAdminLogin}
             onLogout={handleAdminLogout}
+            adminUser={adminUser}
             leads={leads}
             onUpdateLeadStatus={handleUpdateLeadStatus}
             onAssignLeadRep={handleAssignLeadRep}
             announcement={announcement}
             onUpdateAnnouncement={handleUpdateAnnouncement}
             onOpenLogoModal={() => setIsLogoModalOpen(true)}
+            onOpenMetaInspector={() => setIsMetaInspectorOpen(true)}
           />
         );
       case 'thank-you':
@@ -327,7 +388,7 @@ export default function App() {
         <AdminLogoModal
           isOpen={isLogoModalOpen}
           onClose={() => setIsLogoModalOpen(false)}
-          adminEmail={adminEmail || 'alifhakimi1704@gmail.com'}
+          adminEmail={adminUser?.username || 'cleveraadminhebat'}
         />
 
       </div>

@@ -51,7 +51,19 @@ export const Footer: React.FC<FooterProps> = ({
           
           {/* Col 1 & 2: Brand & Accreditation */}
           <div className="lg:col-span-2 space-y-4">
-            <CleveraLogo variant="horizontal" theme="dark" size="lg" onClick={() => onNavigate('home')} />
+            {/* Aesthetic Rounded Brand Card - matching Navigation Header Logo & Typography */}
+            <div 
+              onClick={() => onNavigate('home')}
+              className="inline-flex items-center bg-white px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-blue-400 transition-all cursor-pointer group select-none"
+              title="Clevera Academy - Return to Home"
+            >
+              <CleveraLogo 
+                variant="horizontal" 
+                theme="light" 
+                size="md" 
+                className="group-hover:opacity-95 transition-opacity"
+              />
+            </div>
             
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
               Clevera Academy is Malaysia's premier HRDC-approved corporate training provider. We specialize in high-impact team building, retail leadership, and workforce productivity designed to eliminate department silos and elevate employee performance.
@@ -204,15 +216,6 @@ export const Footer: React.FC<FooterProps> = ({
                   Past Client Photo Gallery
                 </button>
               </li>
-              <li>
-                <button
-                  onClick={openInspector}
-                  className="hover:text-blue-400 transition-colors text-left flex items-center gap-1.5 text-slate-400"
-                >
-                  <FileCode2 className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Sitemap & SEO Preview</span>
-                </button>
-              </li>
             </ul>
           </div>
 
@@ -282,12 +285,6 @@ export const Footer: React.FC<FooterProps> = ({
               className="hover:text-slate-300 transition-colors"
             >
               Terms & Conditions
-            </button>
-            <button
-              onClick={() => onNavigate('admin')}
-              className="text-slate-400 hover:text-blue-400 transition-colors"
-            >
-              Internal Portal
             </button>
           </div>
         </div>

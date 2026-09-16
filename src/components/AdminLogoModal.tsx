@@ -662,7 +662,9 @@ export const AdminLogoModal: React.FC<AdminLogoModalProps> = ({
                       Architectural Dark Header & Footer
                     </span>
                     <div className="py-3 flex items-center justify-between border-b border-white/10">
-                      <CleveraLogo variant="horizontal" theme="dark" size="md" />
+                      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs inline-flex items-center">
+                        <CleveraLogo variant="horizontal" theme="light" size="sm" />
+                      </div>
                       <span className="px-2.5 py-1 bg-white/10 text-slate-300 text-[10px] rounded-full">
                         Nationwide Delivery
                       </span>

@@ -36,20 +36,30 @@ import {
   Sun,
   Moon,
   Smartphone,
-  Check
+  Check,
+  User,
+  EyeOff,
+  Key,
+  ShieldAlert,
+  FileCode2,
+  Globe,
+  Share2,
+  Copy
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
   onNavigate: (route: PageRoute) => void;
   isAdminLoggedIn: boolean;
-  onLogin: (email: string) => void;
+  onLogin: (token: string, user: { username: string; role: string }) => void;
   onLogout: () => void;
+  adminUser?: { username: string; role: string } | null;
   leads: CorporateInquiry[];
   onUpdateLeadStatus: (id: string, status: LeadStatus) => void;
   onAssignLeadRep: (id: string, rep: string) => void;
   announcement: SiteAnnouncement;
   onUpdateAnnouncement: (announcement: SiteAnnouncement) => void;
   onOpenLogoModal?: () => void;
+  onOpenMetaInspector?: () => void;
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
@@ -57,16 +67,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   isAdminLoggedIn,
   onLogin,
   onLogout,
+  adminUser,
   leads,
   onUpdateLeadStatus,
   onAssignLeadRep,
   announcement,
   onUpdateAnnouncement,
   onOpenLogoModal,
+  onOpenMetaInspector,
 }) => {
-  const [emailInput, setEmailInput] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [lockoutSeconds, setLockoutSeconds] = useState<number | null>(null);
 
   // Logo Config hook
   const { 
@@ -84,8 +99,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [logoUrlInput, setLogoUrlInput] = useState('');
   const logoFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Admin tabs: 'leads' | 'analytics' | 'content-editor' | 'branding-logo' | 'integrations'
-  const [activeTab, setActiveTab] = useState<'leads' | 'analytics' | 'content-editor' | 'branding-logo' | 'integrations'>('leads');
+  // Admin tabs: 'leads' | 'analytics' | 'content-editor' | 'branding-logo' | 'integrations' | 'seo-sitemap'
+  const [activeTab, setActiveTab] = useState<'leads' | 'analytics' | 'content-editor' | 'branding-logo' | 'integrations' | 'seo-sitemap'>('leads');
+
+  // SEO & Sitemap Suite State
+  const [seoRoute, setSeoRoute] = useState<PageRoute>('home');
+  const [seoSubTab, setSeoSubTab] = useState<'serp' | 'og' | 'sitemap' | 'robots'>('serp');
+  const [copiedSeoText, setCopiedSeoText] = useState<string | null>(null);
 
   // Leads filter & search
   const [leadSearch, setLeadSearch] = useState('');
@@ -103,26 +123,47 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [announcementActive, setAnnouncementActive] = useState(announcement.active);
   const [contentSaved, setContentSaved] = useState(false);
 
-  const AUTHORIZED_EMAILS = ['alifhakimi1704@gmail.com', 'alif@cleveraacademy.my'];
-  const PRIMARY_ADMIN_EMAIL = 'alifhakimi1704@gmail.com';
+  // Security lockout countdown timer
+  React.useEffect(() => {
+    if (lockoutSeconds === null || lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => (prev && prev > 1 ? prev - 1 : null));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
 
-  const handleManualLogin = (e: React.FormEvent) => {
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = emailInput.trim().toLowerCase();
-    const cleanPass = passwordInput.trim().toLowerCase();
-    
-    if (AUTHORIZED_EMAILS.includes(cleanEmail) || cleanPass === 'admin123' || cleanPass === 'clevera2026' || cleanEmail.includes('admin')) {
-      onLogin(cleanEmail || PRIMARY_ADMIN_EMAIL);
-      setLoginError('');
-    } else {
-      setLoginError(`Access Restricted. Authorized admin accounts: ${AUTHORIZED_EMAILS.join(' or ')}.`);
-    }
-  };
-
-  const handleQuickDemoLogin = () => {
-    setEmailInput(PRIMARY_ADMIN_EMAIL);
-    onLogin(PRIMARY_ADMIN_EMAIL);
+    if (lockoutSeconds && lockoutSeconds > 0) return;
+    setIsSubmitting(true);
     setLoginError('');
+
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: usernameInput.trim(),
+          password: passwordInput.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        onLogin(data.token, data.user);
+        setLoginError('');
+      } else {
+        if (response.status === 429) {
+          setLockoutSeconds(data.remainingSeconds || 900);
+        }
+        setLoginError(data.error || 'Authentication denied. Access attempt logged.');
+      }
+    } catch (err) {
+      setLoginError('Security authentication server unreachable. Please verify server connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Filtered leads
@@ -196,103 +237,131 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   };
 
   // -------------------------------------------------------------
-  // 1. LOGIN GATE IF NOT AUTHENTICATED AS ALIF
+  // 1. SECURE LOGIN GATE (PROTECTED BACKEND SUB-SYSTEM)
   // -------------------------------------------------------------
   if (!isAdminLoggedIn) {
     return (
-      <div className="max-w-md mx-auto px-4 py-16">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-slate-950/95">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
           
-          <div className="bg-slate-900 text-white p-6 text-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600/30 text-blue-400 flex items-center justify-center mx-auto mb-1">
-              <Lock className="w-6 h-6" />
+          {/* Header */}
+          <div className="p-8 pb-6 text-center border-b border-slate-800/80 relative">
+            <div className="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>PORTAL: /admin</span>
             </div>
-            <h2 className="text-xl font-bold font-sans">
-              Staff Portal Authentication
+
+            <div className="w-14 h-14 rounded-2xl bg-[#3430eb]/20 border border-[#3430eb]/40 text-[#3430eb] flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <Key className="w-7 h-7 text-blue-400" />
+            </div>
+
+            <h2 className="text-xl font-bold font-sans text-white tracking-tight">
+              Administrative Subsystem
             </h2>
-            <p className="text-xs text-slate-400">
-              Access is restricted to authorized administrator: <strong className="text-blue-300">{PRIMARY_ADMIN_EMAIL}</strong>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+              Clevera Academy internal portal. Access is restricted to authorized operators only.
             </p>
           </div>
 
-          <div className="p-6 sm:p-8 space-y-5">
-            {loginError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{loginError}</span>
+          <div className="p-8 space-y-6">
+            {/* Lockout Banner */}
+            {lockoutSeconds !== null && lockoutSeconds > 0 && (
+              <div className="bg-red-950/80 border border-red-800 text-red-300 text-xs p-3.5 rounded-xl flex items-start gap-2.5 shadow-sm">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                <div>
+                  <strong className="block font-semibold text-red-200">Security Lockout Active</strong>
+                  <span>Too many failed login attempts. Retry available in {Math.floor(lockoutSeconds / 60)}m {lockoutSeconds % 60}s.</span>
+                </div>
               </div>
             )}
 
-            <form onSubmit={handleManualLogin} className="space-y-4">
+            {/* Error Banner */}
+            {loginError && (!lockoutSeconds || lockoutSeconds <= 0) && (
+              <div className="bg-red-950/60 border border-red-800/80 text-red-300 text-xs p-3.5 rounded-xl flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                <span className="leading-relaxed">{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Corporate Email
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Administrative Username
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="email"
+                    type="text"
                     required
-                    placeholder="alif@cleveraacademy.my"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    autoComplete="username"
+                    disabled={Boolean(lockoutSeconds && lockoutSeconds > 0) || isSubmitting}
+                    placeholder="Enter administrator username"
+                    value={usernameInput}
+                    onChange={(e) => setUsernameInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-[#3430eb] focus:border-transparent focus:outline-none transition-all disabled:opacity-50"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Password / PIN
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Master Password
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    disabled={Boolean(lockoutSeconds && lockoutSeconds > 0) || isSubmitting}
+                    placeholder="Enter master password"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-11 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-[#3430eb] focus:border-transparent focus:outline-none transition-all disabled:opacity-50"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all active:scale-95"
+                disabled={isSubmitting || Boolean(lockoutSeconds && lockoutSeconds > 0)}
+                className="w-full py-3.5 bg-[#3430eb] hover:bg-blue-700 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 mt-2"
               >
-                Sign In to Staff CRM
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Verifying with Backend...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-blue-200" />
+                    <span>Authenticate Admin Session</span>
+                  </>
+                )}
               </button>
             </form>
 
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <div className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Zero-Trust Endpoint Security</span>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-slate-400 font-semibold">Or Instant Access</span>
-              </div>
-            </div>
-
-            {/* Quick 1-Click Demo Login for Alif */}
-            <div className="space-y-2">
-              <button
-                onClick={handleQuickDemoLogin}
-                className="w-full py-3 bg-[#3430eb] hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-              >
-                <Unlock className="w-4 h-4" />
-                <span>1-Click Authenticate as Alif (Super Admin)</span>
-              </button>
-              <p className="text-[11px] text-center text-slate-400">
-                Grants full privileges to manage corporate inquiries & change website logo
+              <p className="leading-relaxed">
+                Direct URL routing required (<code className="text-blue-300 font-mono text-[10px]">/admin</code>). Multi-attempt rate limiting and encrypted bearer session active.
               </p>
             </div>
 
-            <div className="text-center pt-2">
+            <div className="text-center pt-1">
               <button
                 onClick={() => onNavigate('home')}
-                className="text-xs text-slate-500 hover:text-slate-800 font-medium"
+                className="text-xs text-slate-400 hover:text-slate-200 font-medium transition-colors"
               >
                 &larr; Return to Public Website
               </button>
@@ -326,12 +395,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Logged in as: <strong className="text-blue-300">alifhakimi1704@gmail.com (Super Admin)</strong> &bull; HRDC Training Provider Desk
+              Logged in as: <strong className="text-blue-300">{adminUser?.username || 'cleveraadminhebat'} ({adminUser?.role || 'Super Administrator'})</strong> &bull; HRDC Training Provider Desk
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
+          <button
+            onClick={() => {
+              setActiveTab('seo-sitemap');
+            }}
+            className="px-3.5 py-1.5 text-xs text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5 font-bold cursor-pointer"
+            title="Search Engine & Sitemap Administration"
+          >
+            <FileCode2 className="w-3.5 h-3.5 text-blue-400" />
+            <span>SEO & Sitemap</span>
+          </button>
           <button
             onClick={() => {
               setActiveTab('branding-logo');
@@ -377,6 +456,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         {[
           { id: 'leads', label: `Corporate Inquiries (${leads.length})`, icon: Users },
           { id: 'branding-logo', label: 'Brand & Website Logo Manager', icon: Palette, badge: 'Admin Privilege' },
+          { id: 'seo-sitemap', label: 'SEO & XML Sitemap', icon: FileCode2, badge: 'Protected' },
           { id: 'analytics', label: 'Traffic & Conversion Analytics', icon: BarChart3 },
           { id: 'content-editor', label: 'Modular Site Content Editor', icon: Settings },
           { id: 'integrations', label: 'Google Sheets & Webhooks', icon: FileSpreadsheet },
@@ -1308,7 +1388,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         <span className="text-emerald-400 font-bold">Active</span>
                       </div>
                       <div className="py-2 flex items-center justify-between border-b border-white/10">
-                        <CleveraLogo variant="horizontal" theme="dark" size="md" />
+                        <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs inline-flex items-center">
+                          <CleveraLogo variant="horizontal" theme="light" size="sm" />
+                        </div>
                         <span className="text-[10px] text-slate-400 font-medium">
                           100% SBL-Khas
                         </span>
@@ -1362,6 +1444,443 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
         </div>
       )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 6: SEO, SEARCH CONSOLE & XML SITEMAP (PROTECTED ADMIN SUITE) */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'seo-sitemap' && (() => {
+        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://cleveraacademy.my';
+        
+        const routeMetaMap: Record<PageRoute, { title: string; desc: string; ogImage: string; path: string }> = {
+          home: {
+            title: 'Clevera Academy | HRDC Claimable Corporate Training & Team Building Malaysia',
+            desc: 'Accelerate workforce productivity with 100% HRDC-claimable corporate workshops, retail leadership programs, and energetic team building retreats in Malaysia.',
+            ogImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1200&auto=format&fit=crop',
+            path: '/',
+          },
+          modules: {
+            title: 'Training Modules Catalog | Retail, Synergy & Digital AI | Clevera Academy',
+            desc: 'Browse 10+ certified corporate training masterclasses claimable under HRDC SBL-Khas scheme. Download complete syllabi and outlines.',
+            ogImage: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=1200&auto=format&fit=crop',
+            path: '/modules',
+          },
+          'hrdc-guide': {
+            title: 'Malaysian HRDC Claiming Guide & e-TRiS Walkthrough | Clevera Academy',
+            desc: 'Complete step-by-step employer guide to claiming 100% corporate training grants on e-TRiS with zero out-of-pocket payment.',
+            ogImage: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1200&auto=format&fit=crop',
+            path: '/hrdc-guide',
+          },
+          'gallery-about': {
+            title: 'Corporate Training Gallery & About Clevera Academy | Kuala Lumpur',
+            desc: 'Discover past corporate retreats, retail sales simulations, and meet our HRD Corp certified master trainers (TTT).',
+            ogImage: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1200&auto=format&fit=crop',
+            path: '/gallery-about',
+          },
+          'contact-booking': {
+            title: 'Book HRDC Training & Request e-TRiS Quotation | Clevera Academy',
+            desc: 'Request an official training proposal and quotation within 2 hours. 100% claimable via HRDC SBL-Khas scheme.',
+            ogImage: 'https://images.unsplash.com/photo-1556742049-0a67c5574f73?q=80&w=1200&auto=format&fit=crop',
+            path: '/contact-booking',
+          },
+          admin: {
+            title: 'Staff Operations Gateway | Clevera Academy',
+            desc: 'Protected administrative subsystem. Indexing prohibited by robots.txt directive.',
+            ogImage: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1200&auto=format&fit=crop',
+            path: '/admin',
+          },
+          'thank-you': {
+            title: 'Booking Inquiry Received | Clevera Academy Malaysia',
+            desc: 'Thank you for your training booking. Our HRDC consultant will reach out within 2 hours.',
+            ogImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1200&auto=format&fit=crop',
+            path: '/thank-you',
+          },
+          privacy: {
+            title: 'PDPA Privacy Policy | Clevera Academy Sdn Bhd',
+            desc: 'Compliance with Malaysian Personal Data Protection Act (PDPA 2010) regarding corporate client information.',
+            ogImage: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1200&auto=format&fit=crop',
+            path: '/privacy',
+          },
+          terms: {
+            title: 'Terms of Service & Training Agreement | Clevera Academy',
+            desc: 'Terms governing corporate training delivery, HRDC SBL-Khas claims, and participant attendance compliance.',
+            ogImage: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1200&auto=format&fit=crop',
+            path: '/terms',
+          },
+          '404': {
+            title: 'Page Not Found | Clevera Academy Malaysia',
+            desc: 'The requested resource could not be found.',
+            ogImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1200&auto=format&fit=crop',
+            path: '/404',
+          },
+        };
+
+        const activeMeta = routeMetaMap[seoRoute] || routeMetaMap.home;
+
+        const xmlSitemapContent = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${currentOrigin}/</loc>
+    <lastmod>2026-09-16</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${currentOrigin}/modules</loc>
+    <lastmod>2026-09-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${currentOrigin}/hrdc-guide</loc>
+    <lastmod>2026-09-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>${currentOrigin}/gallery-about</loc>
+    <lastmod>2026-09-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${currentOrigin}/contact-booking</loc>
+    <lastmod>2026-09-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.95</priority>
+  </url>
+</urlset>`;
+
+        const robotsTxtContent = `# Clevera Academy Robots.txt
+# Authorized crawling for Malaysian HRDC Corporate Training Portal
+
+User-agent: *
+Allow: /
+Allow: /modules
+Allow: /hrdc-guide
+Allow: /gallery-about
+Allow: /contact-booking
+
+# Disallow protected staff admin workspace & API endpoints
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: ${currentOrigin}/sitemap.xml
+Host: ${currentOrigin}`;
+
+        const handleCopy = (text: string, label: string) => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text);
+            setCopiedSeoText(label);
+            setTimeout(() => setCopiedSeoText(null), 2500);
+          }
+        };
+
+        const handleDownloadSitemap = () => {
+          const blob = new Blob([xmlSitemapContent], { type: 'application/xml' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'sitemap.xml';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div className="space-y-6">
+            
+            {/* Header / Summary Bar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <FileCode2 className="w-5 h-5 text-[#3430eb]" />
+                    <span>Search Engine Optimization & Sitemap Console</span>
+                  </h3>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                    Index Protected
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Transferred from public website to Admin Subsystem. Manage canonical indexing, Google SERP titles, social share metadata, and crawler directives.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {onOpenMetaInspector && (
+                  <button
+                    onClick={onOpenMetaInspector}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Modal Inspector</span>
+                  </button>
+                )}
+                <a
+                  href="/sitemap.xml"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 bg-[#3430eb] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Live /sitemap.xml</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Sub-Tabs Selector */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              {[
+                { id: 'serp', label: 'Google Search SERP', icon: Search },
+                { id: 'og', label: 'OpenGraph & Social Share', icon: Share2 },
+                { id: 'sitemap', label: 'XML Sitemap (5 Routes)', icon: FileCode2 },
+                { id: 'robots', label: 'Robots.txt Security', icon: ShieldCheck },
+              ].map((sub) => {
+                const Icon = sub.icon;
+                const isCurrent = seoSubTab === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => setSeoSubTab(sub.id as any)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isCurrent
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{sub.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Copy Notification Toast */}
+            {copiedSeoText && (
+              <div className="bg-blue-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-md">
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span>Copied {copiedSeoText} to clipboard!</span>
+              </div>
+            )}
+
+            {/* SubTab 1: Google SERP Simulator */}
+            {seoSubTab === 'serp' && (
+              <div className="space-y-4">
+                {/* Page Selector */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+                    Select Page:
+                  </span>
+                  {(['home', 'modules', 'hrdc-guide', 'gallery-about', 'contact-booking'] as PageRoute[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setSeoRoute(r)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        seoRoute === r
+                          ? 'bg-blue-50 text-blue-700 border border-blue-300 font-bold'
+                          : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                      }`}
+                    >
+                      {r === 'home' ? 'Home (/)' : `/${r}`}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Google Search Result Box */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Google Malaysia Search Engine Preview
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      google.com.my &bull; Mobile & Desktop Snippet
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl space-y-2 max-w-2xl font-sans">
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px]">
+                        C
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-800 text-xs leading-none">
+                          Clevera Academy Malaysia
+                        </div>
+                        <div className="text-[11px] text-slate-500 leading-tight">
+                          {currentOrigin}{activeMeta.path}
+                        </div>
+                      </div>
+                    </div>
+
+                    <h4 className="text-[#1a0dab] hover:underline text-base sm:text-lg font-medium cursor-pointer leading-snug">
+                      {activeMeta.title}
+                    </h4>
+
+                    <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">
+                      {activeMeta.desc}
+                    </p>
+                  </div>
+
+                  {/* Character metrics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                        <span>Meta Title Length</span>
+                        <span className="text-blue-600 font-mono">{activeMeta.title.length} chars</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className={`h-full ${activeMeta.title.length <= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          style={{ width: `${Math.min(100, (activeMeta.title.length / 70) * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1.5">
+                        Target: 50-65 chars for optimal SERP desktop & mobile rendering.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                        <span>Meta Description Length</span>
+                        <span className="text-blue-600 font-mono">{activeMeta.desc.length} chars</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className={`h-full ${activeMeta.desc.length <= 160 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          style={{ width: `${Math.min(100, (activeMeta.desc.length / 160) * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1.5">
+                        Target: 120-160 chars for high CTR and keyword highlights.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SubTab 2: OpenGraph / Social Share */}
+            {seoSubTab === 'og' && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    WhatsApp / LinkedIn / Twitter Social Card Simulator
+                  </span>
+                  <button
+                    onClick={() => handleCopy(`<meta property="og:title" content="${activeMeta.title}" />\n<meta property="og:description" content="${activeMeta.desc}" />\n<meta property="og:image" content="${activeMeta.ogImage}" />`, 'OpenGraph tags')}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy OG Meta Tags</span>
+                  </button>
+                </div>
+
+                <div className="max-w-md mx-auto border border-slate-200 rounded-2xl overflow-hidden shadow-md bg-white">
+                  <div className="h-48 bg-slate-100 relative overflow-hidden">
+                    <img 
+                      src={activeMeta.ogImage} 
+                      alt="OG Share Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-xs">
+                      1200 x 630 px (HD OpenGraph)
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-1.5">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      cleveraacademy.my
+                    </span>
+                    <h5 className="font-bold text-slate-900 text-sm leading-snug">
+                      {activeMeta.title}
+                    </h5>
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {activeMeta.desc}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SubTab 3: XML Sitemap */}
+            {seoSubTab === 'sitemap' && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                      XML Sitemap Payload (Standard 0.9 Protocol)
+                    </span>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Canonical indexing for Malaysian search engine crawlers. Accessible directly at <code className="text-blue-600 font-mono">/sitemap.xml</code>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopy(xmlSitemapContent, 'XML Sitemap')}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy XML</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadSitemap}
+                      className="px-3 py-1.5 bg-[#3430eb] hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download sitemap.xml</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto max-h-96 border border-slate-800">
+                  <pre>{xmlSitemapContent}</pre>
+                </div>
+              </div>
+            )}
+
+            {/* SubTab 4: Robots.txt Rules */}
+            {seoSubTab === 'robots' && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                      Robots.txt Crawler Directives
+                    </span>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Specifies search engine allowances. Strictly blocks indexing of protected <code className="text-red-500 font-mono">/admin</code> and backend <code className="text-red-500 font-mono">/api/</code> routes.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopy(robotsTxtContent, 'Robots.txt')}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Directives</span>
+                    </button>
+                    <a
+                      href="/robots.txt"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>View Live /robots.txt</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto border border-slate-800">
+                  <pre>{robotsTxtContent}</pre>
+                </div>
+              </div>
+            )}
+
+          </div>
+        );
+      })()}
 
       {/* ------------------------------------------------------------------ */}
       {/* LEAD DETAILS POPUP MODAL */}

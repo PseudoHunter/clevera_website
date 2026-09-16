@@ -79,17 +79,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden md:inline">+60 3-2282 8900</span>
                 <span className="md:hidden">Call HQ</span>
               </a>
-              <span className="text-slate-700 hidden sm:inline">|</span>
-              <button
-                onClick={openInspector}
-                className="text-slate-400 hover:text-blue-300 flex items-center gap-1 text-[11px] transition-colors"
-                title="View Sitemap & Robots.txt"
-              >
-                <FileCode2 className="w-3 h-3 text-blue-400" />
-                <span className="hidden lg:inline">SEO / Sitemap</span>
-              </button>
-              {isAdminLoggedIn ? (
+              {isAdminLoggedIn && (
                 <div className="flex items-center gap-2">
+                  <span className="text-slate-700 hidden sm:inline">|</span>
+                  <button
+                    onClick={openInspector}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer"
+                    title="View Sitemap & Robots.txt (Admin Only)"
+                  >
+                    <FileCode2 className="w-3 h-3 text-blue-400" />
+                    <span>SEO / Sitemap</span>
+                  </button>
                   <button
                     onClick={onOpenLogoModal}
                     className="bg-[#3430eb] hover:bg-blue-700 text-white text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
@@ -106,15 +106,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Admin Active
                   </button>
                 </div>
-              ) : (
-                <button
-                  onClick={() => handleNav('admin')}
-                  className="text-slate-400 hover:text-white text-[11px] flex items-center gap-1 transition-colors"
-                  title="Admin Portal Login"
-                >
-                  <Lock className="w-3 h-3" />
-                  Staff Login
-                </button>
               )}
             </div>
           </div>
@@ -257,21 +248,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className={`grid ${isAdminLoggedIn ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-2`}>
                 <a
                   href="tel:+60322828900"
                   className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
                 >
                   <Phone className="w-3.5 h-3.5 text-blue-600" />
-                  Call Office
+                  <span>Call HQ: +60 3-2282 8900</span>
                 </a>
-                <button
-                  onClick={() => handleNav('admin')}
-                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
-                >
-                  <Lock className="w-3.5 h-3.5 text-slate-600" />
-                  Admin ({isAdminLoggedIn ? 'Active' : 'Login'})
-                </button>
+                {isAdminLoggedIn && (
+                  <button
+                    onClick={() => handleNav('admin')}
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                    Admin Console (Active)
+                  </button>
+                )}
               </div>
             </div>
           </div>
