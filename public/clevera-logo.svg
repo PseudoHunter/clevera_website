@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <!-- Clevera Academy Official Brand Logo from Business Card -->
+  
+  <!-- Emblem Geometry -->
+  <g transform="translate(300, 96)">
+    <!-- Top Circular Petal (Vibrant Royal Blue) -->
+    <circle cx="0" cy="-30" r="30" fill="#3B82F6" opacity="0.88" style="mix-blend-mode: multiply;" />
+    
+    <!-- Left Circular Petal (Deep Saturated Royal Blue) -->
+    <circle cx="-30" cy="0" r="30" fill="#1D4ED8" opacity="0.94" style="mix-blend-mode: multiply;" />
+    
+    <!-- Right Circular Petal (Soft Translucent Ice Blue) -->
+    <circle cx="30" cy="0" r="30" fill="#BFDBFE" opacity="0.82" style="mix-blend-mode: multiply;" />
+    
+    <!-- Bottom Circular Petal (Vibrant Sky Blue) -->
+    <circle cx="0" cy="30" r="30" fill="#60A5FA" opacity="0.88" style="mix-blend-mode: multiply;" />
+    
+    <!-- Central Negative Space White 4-Pointed Star -->
+    <path d="M 0,-20 C 2.5,-5.5 5.5,-2.5 20,0 C 5.5,2.5 2.5,5.5 0,20 C -2.5,5.5 -5.5,2.5 -20,0 C -5.5,-2.5 -2.5,-5.5 0,-20 Z" fill="#FFFFFF" />
+    
+    <!-- Central Core Blue Node -->
+    <circle cx="0" cy="0" r="6.2" fill="#1D4ED8" />
+  </g>
+
+  <!-- Brand Typography: CLEVERA -->
+  <text x="300" y="254" 
+        text-anchor="middle" 
+        font-family="'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" 
+        font-weight="900" 
+        font-size="78" 
+        letter-spacing="-0.01em" 
+        fill="#000000">
+    CLEVERA
+  </text>
+
+  <!-- Brand Sub-title: ACADEMY -->
+  <text x="300" y="312" 
+        text-anchor="middle" 
+        font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" 
+        font-weight="600" 
+        font-size="31" 
+        letter-spacing="0.32em" 
+        fill="#000000">
+    ACADEMY
+  </text>
+</svg>
