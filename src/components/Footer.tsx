@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageRoute } from '../types';
 import { CleveraLogo } from './CleveraLogo';
+import { useContent } from '../context/ContentContext';
 import { 
   MapPin, 
   Phone, 
@@ -27,6 +28,7 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenSitemapModal,
   onOpenEligibility
 }) => {
+  const { footerConfig, contactConfig } = useContent();
   const [brochureEmail, setBrochureEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -66,24 +68,24 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
             
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
-              Clevera Academy is Malaysia's premier HRDC-approved corporate training provider. We specialize in high-impact team building, retail leadership, and workforce productivity designed to eliminate department silos and elevate employee performance.
+              {footerConfig.brandDescription}
             </p>
 
             <div className="pt-2 flex flex-wrap items-center gap-3">
               <div className="inline-flex items-center gap-1.5 bg-blue-900/40 border border-blue-700/50 text-blue-300 text-xs px-3 py-1.5 rounded-lg font-medium">
                 <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>HRD Corp Registered (MyCoID: 1429810-W)</span>
+                <span>{footerConfig.myCoIdText}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-medium">
                 <Award className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>100% SBL-Khas Grant Claimable</span>
+                <span>{footerConfig.grantClaimableText}</span>
               </div>
             </div>
 
             {/* Quick brochure subscribe */}
             <div className="pt-4 max-w-sm">
               <span className="block text-xs font-semibold text-slate-200 mb-2">
-                Download 2026 Corporate Training Catalog (PDF):
+                {footerConfig.catalogHeading}
               </span>
               {subscribed ? (
                 <div className="bg-emerald-900/50 border border-emerald-600/60 text-emerald-200 text-xs p-3 rounded-xl flex items-center gap-2">
@@ -104,7 +106,7 @@ export const Footer: React.FC<FooterProps> = ({
                     type="submit"
                     className="bg-[#3430eb] hover:bg-[#2723cb] text-white font-bold text-xs px-4 py-2.5 rounded-full transition-colors shrink-0 flex items-center gap-1 cursor-pointer shadow-md"
                   >
-                    <span>Get PDF</span>
+                    <span>{footerConfig.catalogButtonText}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </form>
@@ -189,7 +191,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={() => onNavigate('hrdc-guide')}
                   className="hover:text-blue-400 transition-colors text-left"
                 >
-                  HRDC Grant & Levy Calculator
+                  SBL-Khas Grant Scheme
                 </button>
               </li>
               <li>
@@ -222,27 +224,26 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Col 5: Real Malaysian Address & Contacts */}
           <div>
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Malaysian Headquarters
+              {contactConfig.officeName}
             </h4>
             <div className="space-y-3.5 text-xs text-slate-400">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <address className="not-italic leading-relaxed">
-                  Level 19, Boutique Office 1,<br />
-                  Menara Bangsar KL Eco City,<br />
-                  No. 3, Jalan Bangsar, Kampung Haji Abdullah Hukum,<br />
-                  59200 Kuala Lumpur, Malaysia
+                  {contactConfig.addressLine1},<br />
+                  {contactConfig.addressLine2},<br />
+                  {contactConfig.cityStateZip}
                 </address>
               </div>
 
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-blue-400 shrink-0" />
                 <div>
-                  <a href="tel:+60322828900" className="hover:text-white transition-colors block">
-                    +60 3-2282 8900 (Office)
+                  <a href={`tel:${contactConfig.primaryPhone.replace(/\s+/g, '')}`} className="hover:text-white transition-colors block">
+                    {contactConfig.primaryPhone} ({contactConfig.phoneLabel})
                   </a>
-                  <a href="https://wa.me/60123847291" target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors text-[11px] text-slate-400">
-                    +60 12-384 7291 (WhatsApp Hot-Desk)
+                  <a href={contactConfig.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors text-[11px] text-slate-400">
+                    {contactConfig.whatsappNumber} ({contactConfig.whatsappLabel})
                   </a>
                 </div>
               </div>
@@ -250,18 +251,20 @@ export const Footer: React.FC<FooterProps> = ({
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-blue-400 shrink-0" />
                 <div>
-                  <a href="mailto:info@cleveraacademy.my" className="hover:text-white transition-colors block">
-                    info@cleveraacademy.my
+                  <a href={`mailto:${contactConfig.primaryEmail}`} className="hover:text-white transition-colors block">
+                    {contactConfig.primaryEmail}
                   </a>
-                  <a href="mailto:hrdc@cleveraacademy.my" className="hover:text-white transition-colors text-[11px] text-slate-400">
-                    hrdc@cleveraacademy.my
-                  </a>
+                  {contactConfig.secondaryEmail && (
+                    <a href={`mailto:${contactConfig.secondaryEmail}`} className="hover:text-white transition-colors text-[11px] text-slate-400">
+                      {contactConfig.secondaryEmail}
+                    </a>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2.5 pt-1">
                 <Clock className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Mon – Fri: 8:30 AM – 6:00 PM (MYT)</span>
+                <span>{contactConfig.operatingHours}</span>
               </div>
             </div>
           </div>
@@ -271,7 +274,7 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>
-            &copy; {new Date().getFullYear()} Clevera Academy Sdn Bhd. All Rights Reserved. HRD Corp Registered Training Provider.
+            {footerConfig.copyrightText}
           </p>
           <div className="flex flex-wrap items-center gap-6">
             <button 

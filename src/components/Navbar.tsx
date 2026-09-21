@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PageRoute } from '../types';
 import { CleveraLogo } from './CleveraLogo';
 import { 
@@ -11,7 +11,8 @@ import {
   FileCode2, 
   ChevronRight,
   Sparkles,
-  Palette
+  Palette,
+  Key
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,6 +35,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   announcementActive = true,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Logo 5-click easter egg for Admin Access
+  const logoClicksRef = useRef<number>(0);
+  const logoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [unlockToast, setUnlockToast] = useState<{ show: boolean; count: number }>({ show: false, count: 0 });
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (logoTimerRef.current) clearTimeout(logoTimerRef.current);
+    };
+  }, []);
 
   const openInspector = onOpenMetaInspector || onOpenSitemapModal || (() => {});
 
@@ -51,11 +70,57 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleLogoClick = (e: React.MouseEvent) => {
+    // If admin is already authenticated, normal home navigation
+    if (isAdminLoggedIn) {
+      handleNav('home');
+      return;
+    }
+
+    if (logoTimerRef.current) {
+      clearTimeout(logoTimerRef.current);
+    }
+
+    logoClicksRef.current += 1;
+    const clicks = logoClicksRef.current;
+
+    if (clicks >= 5) {
+      // 5th click reached! Trigger Admin Access!
+      logoClicksRef.current = 0;
+      setUnlockToast({ show: true, count: 5 });
+      setTimeout(() => {
+        setUnlockToast({ show: false, count: 0 });
+      }, 3500);
+      handleNav('admin');
+      return;
+    }
+
+    // Reset counter if inactive for 2.5 seconds
+    logoTimerRef.current = setTimeout(() => {
+      logoClicksRef.current = 0;
+      setUnlockToast({ show: false, count: 0 });
+    }, 2500);
+
+    // Provide unobtrusive feedback starting from 3rd click
+    if (clicks >= 3) {
+      setUnlockToast({ show: true, count: clicks });
+    }
+
+    // Normal click action navigates to home
+    handleNav('home');
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all shadow-xs">
+    <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${
+      isScrolled 
+        ? 'bg-white/85 backdrop-blur-md shadow-xs border-b border-slate-200/80' 
+        : 'bg-white/95 backdrop-blur-md shadow-2xs border-b border-slate-200'
+    }`}>
       {/* Top Banner: HRDC Accreditation & Quick Contact */}
       {announcementActive && (
-        <div className="bg-slate-900 text-slate-100 text-xs py-2 px-4 border-b border-slate-800">
+        <div className={`bg-slate-900 text-slate-100 text-xs px-4 border-b border-slate-800 transition-all duration-300 overflow-hidden ${
+          isScrolled ? 'max-h-0 opacity-0 py-0 border-transparent pointer-events-none' : 'max-h-14 opacity-100 py-2'
+        }`}>
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 bg-blue-600/90 text-white font-semibold text-[11px] px-2 py-0.5 rounded-full">
@@ -114,14 +179,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Navbar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <div className="flex-shrink-0 flex items-center gap-2.5">
-            <CleveraLogo 
-              variant="horizontal" 
-              size="md" 
-              onClick={() => handleNav('home')} 
-            />
+        <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? 'h-16' : 'h-20'}`}>
+          {/* Logo Navigation Button */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <button
+              id="header-logo-btn"
+              onClick={handleLogoClick}
+              className={`group flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-left select-none ${
+                isScrolled
+                  ? 'bg-transparent hover:bg-slate-100/70 active:bg-slate-200/50'
+                  : 'bg-transparent hover:bg-slate-100/60 active:bg-slate-200/40'
+              } ${currentRoute === 'home' ? 'ring-1 ring-blue-500/20 bg-blue-50/50' : ''}`}
+              title="Clevera Academy - Return to Home"
+              aria-label="Clevera Academy Home"
+            >
+              <div className="transition-transform duration-300 group-hover:scale-[1.01]">
+                <CleveraLogo 
+                  variant="horizontal" 
+                  size={isScrolled ? "sm" : "md"}
+                  className="transition-all duration-300"
+                />
+              </div>
+            </button>
             {isAdminLoggedIn && (
               <button
                 onClick={onOpenLogoModal}
@@ -134,6 +213,35 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
+          {/* 5-Click Admin Access Feedback Toast */}
+          {unlockToast.show && (
+            <div 
+              id="admin-easter-egg-toast"
+              className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 text-white border border-blue-500/60 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-semibold backdrop-blur-md animate-in fade-in slide-in-from-top-3 duration-200 pointer-events-none"
+            >
+              {unlockToast.count >= 5 ? (
+                <>
+                  <div className="w-6 h-6 rounded-full bg-[#3430eb] flex items-center justify-center shrink-0 shadow-sm">
+                    <Key className="w-3.5 h-3.5 text-white animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-blue-300 font-bold block">Admin Access Unlocked (5/5)</span>
+                    <span className="text-[11px] text-slate-300">Routing to administrative authentication gate...</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-5 h-5 rounded-full bg-slate-800 border border-blue-400/40 flex items-center justify-center text-[10px] font-mono text-blue-400 shrink-0">
+                    {unlockToast.count}
+                  </div>
+                  <span className="text-slate-300 text-[11px]">
+                    Admin access: <strong className="text-blue-400">{unlockToast.count} / 5</strong> clicks
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1 xl:space-x-2">
             {navItems.map((item) => {
@@ -142,7 +250,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.route}
                   onClick={() => handleNav(item.route)}
-                  className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-all relative flex items-center gap-1.5 ${
+                  className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all relative flex items-center gap-1.5 ${
                     isActive
                       ? 'text-blue-700 bg-blue-50/80 font-bold'
                       : 'text-slate-700 hover:text-blue-600 hover:bg-slate-100/70'

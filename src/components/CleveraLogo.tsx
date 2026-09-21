@@ -110,9 +110,10 @@ export const CleveraLogo: React.FC<CleveraLogoProps> = ({
 
   // If custom uploaded image is active
   if (logoConfig.mode === 'custom-image' && logoConfig.customImageUrl) {
-    const scaleStyle = {
+    const scaleStyle: React.CSSProperties = {
       transform: `scale(${(logoConfig.customImageScale || 100) / 100})`,
       filter: (theme === 'dark' && logoConfig.customImageDarkInvert) ? 'brightness(0) invert(1)' : 'none',
+      mixBlendMode: theme === 'dark' ? 'normal' : 'multiply',
     };
 
     if (variant === 'icon-only') {

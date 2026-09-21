@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { PageRoute, TrainingModule, ModuleCategory } from '../types';
-import { TRAINING_MODULES } from '../data/mockData';
+import { useContent } from '../context/ContentContext';
 import { 
   Search, 
   Filter, 
@@ -25,22 +25,23 @@ export const ModulesPage: React.FC<ModulesPageProps> = ({
   onNavigate,
   onOpenSyllabus,
 }) => {
+  const { modules } = useContent();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ModuleCategory>('all');
   const [downloadingCatalog, setDownloadingCatalog] = useState(false);
   const [catalogDownloaded, setCatalogDownloaded] = useState(false);
 
   const categories: { id: ModuleCategory; label: string; count: number }[] = [
-    { id: 'all', label: 'All Programs', count: TRAINING_MODULES.length },
-    { id: 'retail-leadership', label: 'Retail Leadership & Ops', count: TRAINING_MODULES.filter(m => m.category === 'retail-leadership').length },
-    { id: 'team-synergy', label: 'Team Synergy & Dynamics', count: TRAINING_MODULES.filter(m => m.category === 'team-synergy').length },
-    { id: 'digital-technical', label: 'Digital & AI Skills', count: TRAINING_MODULES.filter(m => m.category === 'digital-technical').length },
-    { id: 'hr-compliance', label: 'Employment Law & HR', count: TRAINING_MODULES.filter(m => m.category === 'hr-compliance').length },
-    { id: 'specialized-business', label: 'Specialized Business', count: TRAINING_MODULES.filter(m => m.category === 'specialized-business').length },
+    { id: 'all', label: 'All Programs', count: modules.length },
+    { id: 'retail-leadership', label: 'Retail Leadership & Ops', count: modules.filter(m => m.category === 'retail-leadership').length },
+    { id: 'team-synergy', label: 'Team Synergy & Dynamics', count: modules.filter(m => m.category === 'team-synergy').length },
+    { id: 'digital-technical', label: 'Digital & AI Skills', count: modules.filter(m => m.category === 'digital-technical').length },
+    { id: 'hr-compliance', label: 'Employment Law & HR', count: modules.filter(m => m.category === 'hr-compliance').length },
+    { id: 'specialized-business', label: 'Specialized Business', count: modules.filter(m => m.category === 'specialized-business').length },
   ];
 
   const filteredModules = useMemo(() => {
-    return TRAINING_MODULES.filter((m) => {
+    return modules.filter((m) => {
       const matchesCategory = selectedCategory === 'all' || m.category === selectedCategory;
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = !query || 
@@ -51,7 +52,7 @@ export const ModulesPage: React.FC<ModulesPageProps> = ({
         m.targetAudience.some(a => a.toLowerCase().includes(query));
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [modules, selectedCategory, searchQuery]);
 
   const handleDownloadCatalog = () => {
     setDownloadingCatalog(true);
@@ -131,7 +132,7 @@ export const ModulesPage: React.FC<ModulesPageProps> = ({
 
             {/* Total Results Count */}
             <div className="text-xs font-semibold text-slate-500 self-end md:self-center">
-              Showing <span className="font-bold text-slate-900">{filteredModules.length}</span> of {TRAINING_MODULES.length} HRDC Programs
+              Showing <span className="font-bold text-slate-900">{filteredModules.length}</span> of {modules.length} HRDC Programs
             </div>
           </div>
 

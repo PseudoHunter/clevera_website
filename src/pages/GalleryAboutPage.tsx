@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageRoute, Trainer, GalleryItem } from '../types';
-import { GALLERY_ITEMS, TRAINERS } from '../data/mockData';
+import { GALLERY_ITEMS } from '../data/mockData';
+import { useContent } from '../context/ContentContext';
 import { CleveraLogo } from '../components/CleveraLogo';
 import { 
   Award, 
@@ -20,6 +21,7 @@ interface GalleryAboutPageProps {
 }
 
 export const GalleryAboutPage: React.FC<GalleryAboutPageProps> = ({ onNavigate }) => {
+  const { trainers } = useContent();
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'retreat' | 'classroom' | 'outdoor' | 'retail'>('all');
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
 
@@ -221,7 +223,7 @@ export const GalleryAboutPage: React.FC<GalleryAboutPageProps> = ({ onNavigate }
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {TRAINERS.map((trainer) => (
+          {trainers.map((trainer) => (
             <div
               key={trainer.id}
               className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"

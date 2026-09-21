@@ -103,3 +103,104 @@ export interface SiteAnnouncement {
   badge: string;
   linkRoute?: PageRoute;
 }
+
+export interface CalculatorConfig {
+  badge: string;
+  title: string;
+  subtitle: string;
+  levyRatePercent: number; // e.g. 1%
+  minEmployeesForMandatoryLevy: number; // e.g. 10
+  inHouseDailyFeeCap: number; // e.g. RM 6,000 / day
+  inHouseMealAllowancePerPax: number; // e.g. RM 50 / pax / day
+  retreatDailyCourseFeeCapPerPax: number; // e.g. RM 1,300 / pax / day
+  retreatMaxTotalCap: number; // e.g. RM 40,000 max total
+  productivityMultiplierPercent: number; // e.g. 22%
+  productivityMultiplierMonths: number; // e.g. 6 months
+  defaultEmployeeCount: number; // default 45
+  defaultAvgSalary: number; // default 3800
+  defaultTrainingDays: number; // default 2
+  defaultPaxToTrain: number; // default 25
+  upfrontCashDisplay: string; // "RM 0.00"
+  sblKhasGuaranteeText: string; // "100% Direct SBL-Khas"
+}
+
+export interface ContactConfig {
+  sectionTitle: string;
+  sectionSubtitle: string;
+  companyName: string;
+  officeName: string;
+  addressLine1: string;
+  addressLine2: string;
+  cityStateZip: string;
+  primaryPhone: string;
+  phoneLabel: string;
+  whatsappNumber: string;
+  whatsappLabel: string;
+  whatsappUrl: string;
+  primaryEmail: string;
+  secondaryEmail: string;
+  operatingHours: string;
+  accreditationText: string;
+  slaNotice: string;
+}
+
+export interface FooterConfig {
+  brandDescription: string;
+  myCoIdText: string;
+  grantClaimableText: string;
+  catalogHeading: string;
+  catalogButtonText: string;
+  copyrightText: string;
+  pdpaNotice: string;
+}
+
+export interface ClientLogo {
+  id: string;
+  name: string;
+  category: string;
+  logoUrl: string;
+  industry: string;
+  statsOrHighlight: string;
+  featured?: boolean;
+  order: number;
+  active: boolean;
+}
+
+export interface TrustedByConfig {
+  sectionTitle: string;
+  sectionBadge: string;
+  description: string;
+  autoScroll: boolean;
+  scrollSpeed: 'slow' | 'normal' | 'fast';
+  showCategoryFilter: boolean;
+  layoutVariant: 'marquee' | 'grid' | 'carousel';
+}
+
+export interface SectionVisibility {
+  // Home Page Sections
+  hero: boolean;
+  trustedBy: boolean;
+  splitEditorial: boolean;
+  activityLineup: boolean;
+  faculty: boolean;
+  hrdcCalculator: boolean;
+  testimonials: boolean;
+  reachOut: boolean;
+
+  // Global Components
+  announcementBar: boolean;
+  stickyMobileCta: boolean;
+  footer: boolean;
+}
+
+export type AdminContentSubTab = 
+  | 'sections'
+  | 'modules' 
+  | 'trainers' 
+  | 'calculator' 
+  | 'testimonials' 
+  | 'trusted-by'
+  | 'contact' 
+  | 'footer' 
+  | 'announcement';
+

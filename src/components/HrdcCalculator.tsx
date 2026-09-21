@@ -12,38 +12,41 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { PageRoute } from '../types';
+import { useContent } from '../context/ContentContext';
 
 interface HrdcCalculatorProps {
   onNavigate: (route: PageRoute) => void;
 }
 
 export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) => {
-  const [employeeCount, setEmployeeCount] = useState<number>(45);
-  const [avgSalary, setAvgSalary] = useState<number>(3800);
-  const [trainingDays, setTrainingDays] = useState<number>(2);
-  const [paxToTrain, setPaxToTrain] = useState<number>(25);
+  const { calculatorConfig } = useContent();
+
+  const [employeeCount, setEmployeeCount] = useState<number>(calculatorConfig.defaultEmployeeCount || 45);
+  const [avgSalary, setAvgSalary] = useState<number>(calculatorConfig.defaultAvgSalary || 3800);
+  const [trainingDays, setTrainingDays] = useState<number>(calculatorConfig.defaultTrainingDays || 2);
+  const [paxToTrain, setPaxToTrain] = useState<number>(calculatorConfig.defaultPaxToTrain || 25);
   const [trainingType, setTrainingType] = useState<'in-house' | 'retreat'>('in-house');
 
-  // Math logic under Malaysian HRD Corp rules:
-  // Employers with 10+ Malaysian employees contribute 1% of total monthly basic wages + allowances
-  const monthlyLevy = employeeCount * avgSalary * 0.01;
+  // Math logic under configured Malaysian HRD Corp rules:
+  // Employers contribute levyRatePercent% of total monthly basic wages
+  const monthlyLevy = employeeCount * avgSalary * (calculatorConfig.levyRatePercent / 100);
   const annualLevy = monthlyLevy * 12;
 
   // HRDC Allowable Claim Caps:
-  // In-House: Up to RM6,000 course fee / group / day + RM50 meal allowance/pax/day
-  // External / Retreat: Up to RM1,300 course fee / pax / day
+  // In-House: Up to configured inHouseDailyFeeCap / group / day + inHouseMealAllowancePerPax meal allowance/pax/day
+  // External / Retreat: Up to configured retreatDailyCourseFeeCapPerPax / pax / day, capped at retreatMaxTotalCap
   const allowableFee = trainingType === 'in-house' 
-    ? Math.min(6000 * trainingDays, 6000 * trainingDays)
-    : Math.min(1300 * paxToTrain * trainingDays, 40000);
+    ? (calculatorConfig.inHouseDailyFeeCap * trainingDays)
+    : Math.min(calculatorConfig.retreatDailyCourseFeeCapPerPax * paxToTrain * trainingDays, calculatorConfig.retreatMaxTotalCap);
 
-  const allowableMealAllowance = trainingType === 'in-house' ? paxToTrain * 50 * trainingDays : 0;
+  const allowableMealAllowance = trainingType === 'in-house' 
+    ? paxToTrain * calculatorConfig.inHouseMealAllowancePerPax * trainingDays 
+    : 0;
   const totalGrantClaimable = allowableFee + allowableMealAllowance;
 
-  // Net cash from employer: 0 under SBL Khas direct deduction
-  const outOfPocketCash = 0;
-
-  // Projected workforce productivity dividend (typical 15-25% productivity multiplier)
-  const projectedProductivityVal = Math.round(paxToTrain * avgSalary * 0.22 * 6);
+  // Projected workforce productivity dividend from config
+  const multiplier = calculatorConfig.productivityMultiplierPercent / 100;
+  const projectedProductivityVal = Math.round(paxToTrain * avgSalary * multiplier * calculatorConfig.productivityMultiplierMonths);
 
   return (
     <div id="hrdc-grant-calculator" className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
@@ -53,13 +56,13 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
           <div>
             <div className="inline-flex items-center gap-1.5 bg-[#3430eb]/20 border border-[#3430eb]/40 text-[#60a5fa] text-[11px] font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
               <Calculator className="w-3.5 h-3.5" />
-              <span>Interactive Malaysian HRDC Matrix</span>
+              <span>{calculatorConfig.badge}</span>
             </div>
             <h3 className="text-xl sm:text-2xl lg:text-3xl font-black font-display tracking-tight">
-              HRDC Grant & Levy ROI Calculator
+              {calculatorConfig.title}
             </h3>
             <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
-              Calculate your available corporate levy balance and claim 100% of your training costs with zero out-of-pocket employer expense via SBL-Khas.
+              {calculatorConfig.subtitle}
             </p>
           </div>
 
@@ -68,10 +71,10 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
               Employer Upfront Cash
             </span>
             <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-display">
-              RM 0.00
+              {calculatorConfig.upfrontCashDisplay}
             </span>
             <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
-              100% Direct SBL-Khas
+              {calculatorConfig.sblKhasGuaranteeText}
             </span>
           </div>
         </div>

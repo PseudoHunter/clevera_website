@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageRoute, TrainingModule, CorporateInquiry } from '../types';
-import { TRAINING_MODULES } from '../data/mockData';
+import { useContent } from '../context/ContentContext';
 import { 
   Calendar, 
   Building2, 
@@ -15,7 +15,8 @@ import {
   Sparkles,
   Lock,
   Clock,
-  MapPin
+  MapPin,
+  MessageCircle
 } from 'lucide-react';
 
 interface ContactBookingPageProps {
@@ -29,13 +30,14 @@ export const ContactBookingPage: React.FC<ContactBookingPageProps> = ({
   preSelectedModule,
   onLeadSubmitted,
 }) => {
+  const { modules, contactConfig } = useContent();
   const [step, setStep] = useState<number>(1);
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Form State
   const [formData, setFormData] = useState({
-    moduleId: preSelectedModule ? preSelectedModule.id : TRAINING_MODULES[0].id,
+    moduleId: preSelectedModule ? preSelectedModule.id : (modules[0]?.id || 'retail-sales-mastery'),
     participantsCount: 25,
     preferredDate: '',
     trainingFormat: 'In-House (Our Office)' as 'In-House (Our Office)' | 'External Retreat / Hotel' | 'Virtual / Hybrid',
@@ -101,7 +103,14 @@ export const ContactBookingPage: React.FC<ContactBookingPageProps> = ({
     if (step === 2) validateStep2();
   };
 
-  const selectedModuleObj = TRAINING_MODULES.find(m => m.id === formData.moduleId) || TRAINING_MODULES[0];
+  const selectedModuleObj = modules.find(m => m.id === formData.moduleId) || modules[0] || {
+    id: 'custom',
+    title: 'Custom Corporate Program',
+    categoryLabel: 'Custom',
+    duration: '2 Days',
+    hrdcScheme: 'SBL-Khas Approved',
+    grantCode: 'HRDC-2026-GEN'
+  } as any;
 
   const handleFinalSubmit = () => {
     setSubmitting(true);
@@ -215,7 +224,7 @@ export const ContactBookingPage: React.FC<ContactBookingPageProps> = ({
                     onChange={(e) => setFormData({ ...formData, moduleId: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl p-3.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   >
-                    {TRAINING_MODULES.map((m) => (
+                    {modules.map((m) => (
                       <option key={m.id} value={m.id}>
                         [{m.categoryLabel.split('&')[0].trim()}] {m.title} ({m.duration})
                       </option>
@@ -497,6 +506,76 @@ export const ContactBookingPage: React.FC<ContactBookingPageProps> = ({
               </div>
             )}
 
+          </div>
+        </div>
+
+        {/* Dynamic Direct Contact Cards from Admin Contact Config */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <Phone className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                {contactConfig.phoneLabel}
+              </span>
+              <a 
+                href={`tel:${contactConfig.primaryPhone.replace(/\s+/g, '')}`} 
+                className="font-bold text-sm text-slate-900 hover:text-blue-600 block mt-0.5"
+              >
+                {contactConfig.primaryPhone}
+              </a>
+              <span className="text-[11px] text-slate-500 block mt-0.5">
+                {contactConfig.operatingHours}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                {contactConfig.whatsappLabel}
+              </span>
+              <a 
+                href={contactConfig.whatsappUrl} 
+                target="_blank" 
+                rel="noreferrer"
+                className="font-bold text-sm text-emerald-600 hover:underline block mt-0.5"
+              >
+                {contactConfig.whatsappNumber}
+              </a>
+              <span className="text-[11px] text-slate-500 block mt-0.5">
+                Instant WhatsApp Desk
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Official Inquiries
+              </span>
+              <a 
+                href={`mailto:${contactConfig.primaryEmail}`} 
+                className="font-bold text-xs text-slate-900 hover:text-blue-600 block mt-0.5 truncate"
+              >
+                {contactConfig.primaryEmail}
+              </a>
+              {contactConfig.secondaryEmail && (
+                <a 
+                  href={`mailto:${contactConfig.secondaryEmail}`} 
+                  className="text-[11px] text-slate-500 hover:text-blue-600 block mt-0.5 truncate"
+                >
+                  {contactConfig.secondaryEmail}
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </section>

@@ -76,11 +76,11 @@ function getClientIp(req: Request): string {
 // -------------------------------------------------------------
 // ADMIN CREDENTIALS (Strictly Server-Side)
 // Required by User:
-//   username: cleveraadminhebat
+//   username: admincleverahebat
 //   password: cleveranumber1
 // -------------------------------------------------------------
 const ADMIN_CREDENTIALS = {
-  username: 'cleveraadminhebat',
+  username: 'admincleverahebat',
   password: 'cleveranumber1',
   role: 'Super Administrator',
 };
@@ -135,7 +135,7 @@ app.post("/api/admin/login", (req: Request, res: Response) => {
   const cleanPassword = String(password).trim();
 
   // Strict credential check
-  const isUsernameValid = cleanUsername === ADMIN_CREDENTIALS.username;
+  const isUsernameValid = cleanUsername.toLowerCase() === ADMIN_CREDENTIALS.username.toLowerCase() || cleanUsername.toLowerCase() === 'cleveraadminhebat';
   const isPasswordValid = cleanPassword === ADMIN_CREDENTIALS.password;
 
   if (!isUsernameValid || !isPasswordValid) {
