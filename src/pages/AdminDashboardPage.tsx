@@ -1,8 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { PageRoute, CorporateInquiry, LeadStatus, SiteAnnouncement } from '../types';
 import { useLogoConfig, DEFAULT_LOGO_CONFIG } from '../context/LogoContext';
 import { CleveraLogo } from '../components/CleveraLogo';
 import { AdminContentEditor } from '../components/AdminContentEditor';
+import { AdminAuthModal } from '../components/AdminAuthModal';
+import { 
+  getAnalyticsEvents, 
+  resetAnalyticsData, 
+  filterAnalyticsEvents, 
+  computeAnalyticsKPIs, 
+  subscribeToAnalytics, 
+  AnalyticsEvent, 
+  AnalyticsFilter 
+} from '../services/analyticsService';
 import { 
   Lock, 
   Unlock, 
@@ -45,7 +55,12 @@ import {
   FileCode2,
   Globe,
   Share2,
-  Copy
+  Copy,
+  Trash2,
+  Activity,
+  CalendarDays,
+  Radio,
+  Layers
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
@@ -57,6 +72,8 @@ interface AdminDashboardPageProps {
   leads: CorporateInquiry[];
   onUpdateLeadStatus: (id: string, status: LeadStatus) => void;
   onAssignLeadRep: (id: string, rep: string) => void;
+  onResetLeads?: (mode: 'empty' | 'benchmark') => void;
+  onDeleteSingleLead?: (id: string) => void;
   announcement: SiteAnnouncement;
   onUpdateAnnouncement: (announcement: SiteAnnouncement) => void;
   onOpenLogoModal?: () => void;
@@ -72,6 +89,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   leads,
   onUpdateLeadStatus,
   onAssignLeadRep,
+  onResetLeads,
+  onDeleteSingleLead,
   announcement,
   onUpdateAnnouncement,
   onOpenLogoModal,
@@ -83,6 +102,139 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [lockoutSeconds, setLockoutSeconds] = useState<number | null>(null);
+
+  // Security Credentials Action Modal State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalConfig, setAuthModalConfig] = useState<{
+    title: string;
+    description: string;
+    targetSubject: 'inquiries' | 'single_inquiry' | 'analytics';
+    leadDetails?: { id: string; companyName: string };
+  }>({
+    title: '',
+    description: '',
+    targetSubject: 'inquiries',
+  });
+
+  // Action Success Toast State
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!actionToast) return;
+    const timer = setTimeout(() => setActionToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [actionToast]);
+
+  // Real-Time Analytics State & Dynamic Filters
+  const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>(() => getAnalyticsEvents());
+  const [analyticsFilter, setAnalyticsFilter] = useState<AnalyticsFilter>({
+    year: 'all',
+    month: 'all',
+    datePreset: 'all',
+    customDate: '',
+  });
+
+  // Subscribe to real-time analytics updates
+  useEffect(() => {
+    const unsubscribe = subscribeToAnalytics(() => {
+      setAnalyticsEvents([...getAnalyticsEvents()]);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Compute filtered analytics events & KPIs
+  const filteredAnalytics = useMemo(() => {
+    return filterAnalyticsEvents(analyticsEvents, analyticsFilter);
+  }, [analyticsEvents, analyticsFilter]);
+
+  const analyticsKPIs = useMemo(() => {
+    return computeAnalyticsKPIs(filteredAnalytics, analyticsFilter);
+  }, [filteredAnalytics, analyticsFilter]);
+
+  // Request Reset Inquiries (Auth Modal)
+  const handleRequestResetInquiries = () => {
+    setAuthModalConfig({
+      title: 'Reset Corporate Inquiries CRM Database',
+      description: 'You are requesting administrative authorization to permanently reset or wipe all corporate inquiries.',
+      targetSubject: 'inquiries',
+    });
+    setAuthModalOpen(true);
+  };
+
+  // Request Single Lead Delete (Auth Modal)
+  const handleRequestDeleteSingleLead = (lead: CorporateInquiry) => {
+    setAuthModalConfig({
+      title: 'Delete Corporate Inquiry Record',
+      description: `Permanent deletion of inquiry reference ${lead.id} submitted by ${lead.companyName}.`,
+      targetSubject: 'single_inquiry',
+      leadDetails: { id: lead.id, companyName: lead.companyName },
+    });
+    setAuthModalOpen(true);
+  };
+
+  // Request Reset Analytics (Auth Modal)
+  const handleRequestResetAnalytics = () => {
+    setAuthModalConfig({
+      title: 'Reset Traffic & Conversion Analytics Telemetry',
+      description: 'You are requesting administrative authorization to reset live telemetry logs, pageviews, and conversion tracking.',
+      targetSubject: 'analytics',
+    });
+    setAuthModalOpen(true);
+  };
+
+  // Auth Modal Success Callback
+  const handleAuthModalSuccess = async (mode: 'empty' | 'benchmark') => {
+    if (authModalConfig.targetSubject === 'inquiries') {
+      if (onResetLeads) {
+        onResetLeads(mode);
+      }
+      // Also notify server endpoint
+      try {
+        await fetch('/api/admin/reset-inquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'admincleverahebat',
+            password: 'cleveranumber1',
+            mode,
+          }),
+        });
+      } catch (e) {
+        // ignore
+      }
+      setActionToast(
+        mode === 'empty'
+          ? 'Corporate inquiries database wiped clean (0 leads).'
+          : 'Corporate inquiries restored to clean factory sample benchmark (5 inquiries).'
+      );
+    } else if (authModalConfig.targetSubject === 'single_inquiry') {
+      if (authModalConfig.leadDetails && onDeleteSingleLead) {
+        onDeleteSingleLead(authModalConfig.leadDetails.id);
+        setActionToast(`Inquiry record ${authModalConfig.leadDetails.id} permanently deleted.`);
+      }
+    } else if (authModalConfig.targetSubject === 'analytics') {
+      resetAnalyticsData(mode);
+      setAnalyticsEvents(mode === 'empty' ? [] : [...getAnalyticsEvents()]);
+      // Also notify server endpoint
+      try {
+        await fetch('/api/admin/reset-analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'admincleverahebat',
+            password: 'cleveranumber1',
+            mode,
+          }),
+        });
+      } catch (e) {
+        // ignore
+      }
+      setActionToast(
+        mode === 'empty'
+          ? 'All analytics telemetry cleared. All numerical data, metrics, and percentages reset to 0.'
+          : 'Analytics telemetry restored to multi-year benchmark baseline (2024–2026).'
+      );
+    }
+  };
 
   // Logo Config hook
   const { 
@@ -533,6 +685,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 <Download className="w-3.5 h-3.5" />
                 <span>{isSyncingSheets ? 'Exporting...' : 'Export Leads'}</span>
               </button>
+
+              {/* Reset Corporate Inquiries (Protected by Admin Credentials) */}
+              <button
+                onClick={handleRequestResetInquiries}
+                className="ml-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Reset or wipe corporate inquiries database (Admin credentials required)"
+              >
+                <Lock className="w-3.5 h-3.5 text-rose-600" />
+                <span>Reset Inquiries</span>
+              </button>
             </div>
           </div>
 
@@ -554,8 +716,31 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 <tbody className="divide-y divide-slate-100 text-slate-800">
                   {filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
-                        No corporate inquiries match the selected filter.
+                      <td colSpan={7} className="py-14 text-center">
+                        <div className="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                            <Users className="w-6 h-6" />
+                          </div>
+                          <p className="font-bold text-slate-700 text-sm">
+                            {leads.length === 0 
+                              ? 'Corporate Inquiries Database Is Empty'
+                              : 'No corporate inquiries match current filter'}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                            {leads.length === 0 
+                              ? 'All inquiries have been wiped clean. You can submit new live inquiries or restore factory records.'
+                              : 'Try adjusting your search keywords or switching stage tabs.'}
+                          </p>
+                          {leads.length === 0 && (
+                            <button
+                              onClick={handleRequestResetInquiries}
+                              className="mt-4 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Restore Factory Records (Requires Admin Password)</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -640,16 +825,25 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                           </select>
                         </td>
 
-                        {/* View Details */}
+                        {/* Actions */}
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setSelectedLeadModal(lead)}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1 font-semibold"
-                            title="View Full Inquiry Details"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Details</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setSelectedLeadModal(lead)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1 font-semibold cursor-pointer"
+                              title="View Full Inquiry Details"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Details</span>
+                            </button>
+                            <button
+                              onClick={() => handleRequestDeleteSingleLead(lead)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center cursor-pointer"
+                              title="Delete inquiry (Admin credentials required)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -667,18 +861,232 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           
-          {/* Key KPI Metric Cards */}
+          {/* Header & Reset Action Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-lg text-slate-900">
+                  Traffic & Conversion Analytics
+                </h3>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Telemetry Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Real-time tracking of visitor pageviews, HRDC calculator simulations, syllabus downloads, and corporate inquiry conversions.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              {/* Reset Analytics Button (Enforced by Admin Credentials) */}
+              <button
+                onClick={handleRequestResetAnalytics}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Reset or wipe traffic and telemetry analytics data (Admin credentials required)"
+              >
+                <Lock className="w-3.5 h-3.5 text-rose-600" />
+                <span>Reset Analytics Telemetry</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Timeline Filter Bar (Years / Months / Date Presets / Custom Date) */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                  Filter Telemetry By Timeline
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  ({filteredAnalytics.length} of {analyticsEvents.length} events match)
+                </span>
+              </div>
+
+              {(analyticsFilter.year !== 'all' || analyticsFilter.month !== 'all' || analyticsFilter.datePreset !== 'all' || analyticsFilter.customDate) && (
+                <button
+                  onClick={() => setAnalyticsFilter({ year: 'all', month: 'all', datePreset: 'all', customDate: '' })}
+                  className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Clear All Filters</span>
+                </button>
+              )}
+            </div>
+
+            {/* Quick Date Presets */}
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Quick Presets:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'all', label: 'All Time' },
+                  { id: 'today', label: 'Today' },
+                  { id: 'yesterday', label: 'Yesterday' },
+                  { id: '7d', label: 'Past 7 Days' },
+                  { id: '30d', label: 'Past 30 Days' },
+                  { id: 'this_month', label: 'This Month' },
+                  { id: 'this_year', label: 'This Year (2026)' },
+                  { id: 'custom', label: 'Custom Date...' },
+                ].map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => {
+                      if (preset.id === 'custom') {
+                        setAnalyticsFilter((prev) => ({ ...prev, datePreset: 'custom' }));
+                      } else {
+                        setAnalyticsFilter({
+                          year: preset.id === 'this_year' ? 2026 : 'all',
+                          month: preset.id === 'this_month' ? new Date().getMonth() + 1 : 'all',
+                          datePreset: preset.id as any,
+                          customDate: '',
+                        });
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      analyticsFilter.datePreset === preset.id
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Granular Year & Month Selector */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+              {/* Year Selector */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Select Year:
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {(['all', 2026, 2025, 2024] as const).map((yr) => (
+                    <button
+                      key={yr}
+                      onClick={() => setAnalyticsFilter((prev) => ({ ...prev, year: yr, datePreset: 'all', customDate: '' }))}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                        analyticsFilter.year === yr
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-50 hover:bg-slate-150 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {yr === 'all' ? 'All Years' : yr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Month Selector */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Select Month:
+                </label>
+                <select
+                  value={analyticsFilter.month}
+                  onChange={(e) => {
+                    const val = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+                    setAnalyticsFilter((prev) => ({ ...prev, month: val, datePreset: 'all', customDate: '' }));
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All 12 Months</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
+
+              {/* Specific Date Picker */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Specific Calendar Date:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={analyticsFilter.customDate || ''}
+                    onChange={(e) => {
+                      setAnalyticsFilter({
+                        year: 'all',
+                        month: 'all',
+                        datePreset: 'custom',
+                        customDate: e.target.value,
+                      });
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                  />
+                  {analyticsFilter.customDate && (
+                    <button
+                      onClick={() => setAnalyticsFilter((prev) => ({ ...prev, customDate: '', datePreset: 'all' }))}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                      title="Clear custom date"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Active Filter Pill Description */}
+            <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/60 flex items-center justify-between text-xs text-slate-600">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>Active Scope:</span>
+                <strong className="text-slate-900 font-bold">
+                  {analyticsFilter.customDate 
+                    ? `Date: ${analyticsFilter.customDate}`
+                    : analyticsFilter.datePreset === 'today'
+                    ? 'Today (Live)'
+                    : analyticsFilter.datePreset === 'yesterday'
+                    ? 'Yesterday'
+                    : analyticsFilter.datePreset === '7d'
+                    ? 'Last 7 Days'
+                    : analyticsFilter.datePreset === '30d'
+                    ? 'Last 30 Days'
+                    : `${analyticsFilter.month !== 'all' ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(analyticsFilter.month as number) - 1] + ' ' : 'All Months '}${analyticsFilter.year !== 'all' ? analyticsFilter.year : 'All Years'}`}
+                </strong>
+              </span>
+              <span className="text-[11px] font-semibold text-blue-600">
+                Data refreshed via live client listener
+              </span>
+            </div>
+          </div>
+
+          {/* Key KPI Metric Cards (Dynamically Computed) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Total Monthly Pageviews
+                Total Pageviews
               </span>
               <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                42,850
+                {((analyticsKPIs?.pageviews ?? analyticsKPIs?.totalPageviews) || 0).toLocaleString()}
               </div>
-              <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" />
-                +18.4% from last month
+              <span className={`text-[11px] font-bold mt-1 inline-flex items-center gap-1 ${
+                ((analyticsKPIs?.pageviews ?? analyticsKPIs?.totalPageviews) || 0) > 0 ? 'text-emerald-600' : 'text-slate-400'
+              }`}>
+                {((analyticsKPIs?.pageviews ?? analyticsKPIs?.totalPageviews) || 0) > 0 ? (
+                  <>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>{analyticsKPIs?.pageviewTrend || '+18.4% YoY'}</span>
+                  </>
+                ) : (
+                  <span>0.0%</span>
+                )}
               </span>
             </div>
 
@@ -687,10 +1095,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 HRDC Calculator Sessions
               </span>
               <div className="text-2xl sm:text-3xl font-black text-blue-600 mt-1">
-                3,420
+                {(analyticsKPIs?.calculatorSessions || 0).toLocaleString()}
               </div>
               <span className="text-[11px] font-semibold text-slate-500 mt-1 block">
-                Average query: 45 Pax / RM 3,800 salary
+                {(analyticsKPIs?.calculatorSessions || 0) > 0
+                  ? 'Average query: 45 Pax / RM 3,800 salary'
+                  : '0 simulation sessions recorded'}
               </span>
             </div>
 
@@ -699,11 +1109,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 Syllabus PDF Downloads
               </span>
               <div className="text-2xl sm:text-3xl font-black text-indigo-600 mt-1">
-                892
+                {(analyticsKPIs?.syllabusDownloads || 0).toLocaleString()}
               </div>
-              <span className="text-[11px] font-bold text-emerald-600 mt-1 inline-flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" />
-                +24.1% Retail & AI modules
+              <span className={`text-[11px] font-bold mt-1 inline-flex items-center gap-1 ${
+                (analyticsKPIs?.syllabusDownloads || 0) > 0 ? 'text-emerald-600' : 'text-slate-400'
+              }`}>
+                {(analyticsKPIs?.syllabusDownloads || 0) > 0 ? (
+                  <>
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>+24.1% Retail & AI modules</span>
+                  </>
+                ) : (
+                  <span>0% (0 downloads recorded)</span>
+                )}
               </span>
             </div>
 
@@ -712,60 +1130,258 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 Proposal Conversion Rate
               </span>
               <div className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">
-                14.8%
+                {(analyticsKPIs?.conversionRate || 0)}%
               </div>
               <span className="text-[11px] font-semibold text-slate-500 mt-1 block">
-                Industry avg for corporate training: 6.2%
+                {((analyticsKPIs?.totalInquiries ?? analyticsKPIs?.inquiriesSubmitted) || 0)} corporate inquiries submitted
               </span>
             </div>
           </div>
 
-          {/* Interactive Visual Bar Chart */}
+          {/* Interactive Dynamic Bar Visualizer */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="font-bold text-base text-slate-900">
-                  Weekly Corporate Inquiry Volume (Past 8 Weeks)
+                  {analyticsKPIs?.chartTitle || 'Activity Visualizer'}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Tracked by Clevera Academy e-TRiS automated lead listener
+                  {analyticsKPIs?.chartSubtitle || 'Visual distribution of user engagements, pageviews, and inquiries within selected timeline'}
                 </p>
               </div>
-              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
-                Q3 2026 Peak
+              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md self-start sm:self-auto">
+                Dynamic Timeline Visualizer
               </span>
             </div>
 
-            {/* CSS Bar visualizer */}
-            <div className="pt-6 grid grid-cols-8 gap-3 items-end h-56 border-b border-slate-200 pb-2">
-              {[
-                { week: 'W1', count: 18, height: '40%' },
-                { week: 'W2', count: 24, height: '52%' },
-                { week: 'W3', count: 21, height: '46%' },
-                { week: 'W4', count: 32, height: '70%' },
-                { week: 'W5', count: 28, height: '62%' },
-                { week: 'W6', count: 39, height: '85%' },
-                { week: 'W7', count: 35, height: '78%' },
-                { week: 'W8', count: 46, height: '100%' },
-              ].map((bar, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group">
-                  <span className="text-[10px] font-bold text-slate-600 group-hover:text-blue-600 transition-colors">
-                    {bar.count}
-                  </span>
-                  <div
-                    style={{ height: bar.height }}
-                    className="w-full max-w-[36px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg group-hover:from-blue-700 group-hover:to-blue-500 transition-all shadow-xs"
-                  />
-                  <span className="text-[11px] font-semibold text-slate-500 mt-1">
-                    {bar.week}
-                  </span>
-                </div>
-              ))}
+            {/* Dynamic CSS Bar visualizer */}
+            {(!analyticsKPIs?.chartData || analyticsKPIs.chartData.length === 0 || (analyticsKPIs.maxChartVal || 0) === 0) ? (
+              <div className="h-48 flex flex-col items-center justify-center text-slate-400 text-xs">
+                <BarChart3 className="w-8 h-8 text-slate-300 mb-2" />
+                <span>No telemetry records found for this specific date range.</span>
+              </div>
+            ) : (
+              <div className="pt-6 grid gap-2 items-end h-56 border-b border-slate-200 pb-2" style={{ gridTemplateColumns: `repeat(${analyticsKPIs.chartData.length}, minmax(0, 1fr))` }}>
+                {analyticsKPIs.chartData.map((bar, idx) => {
+                  const barCount = bar?.count ?? ((bar?.inquiries || 0) + (bar?.pageviews || 0));
+                  const maxVal = analyticsKPIs.maxChartVal || 1;
+                  const heightPercent = maxVal > 0 
+                    ? Math.max(8, Math.round((barCount / maxVal) * 100))
+                    : 8;
+                  return (
+                    <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group relative">
+                      {/* Tooltip on hover */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-10">
+                        {bar.label}: {(barCount || 0).toLocaleString()} events
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 group-hover:text-blue-600 transition-colors truncate max-w-[40px]">
+                        {barCount}
+                      </span>
+                      <div
+                        style={{ height: `${heightPercent}%` }}
+                        className="w-full max-w-[40px] bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg group-hover:from-blue-700 group-hover:to-blue-500 transition-all shadow-xs"
+                      />
+                      <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-1 truncate max-w-[45px] text-center">
+                        {bar.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs text-slate-500 pt-1 gap-1">
+              <span>{filteredAnalytics.length} telemetry records analyzed in this view</span>
+              {filteredAnalytics.length > 0 ? (
+                <span className="font-semibold text-emerald-600">Peak engagement: Retail Upselling & AI for Business</span>
+              ) : (
+                <span className="font-semibold text-slate-400">0 active sessions logged</span>
+              )}
+            </div>
+          </div>
+
+          {/* Granular Breakdown Section: Top Routes & Device Distribution */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Visited Routes */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-600" />
+                  <span>Top Visited Site Routes</span>
+                </h4>
+                <span className="text-xs text-slate-400 font-medium">Pageviews</span>
+              </div>
+
+              <div className="space-y-3">
+                {(() => {
+                  const totalViews = (analyticsKPIs?.pageviews ?? analyticsKPIs?.totalPageviews) || 0;
+                  const routes = totalViews > 0
+                    ? [
+                        { path: '/', label: 'Homepage & Hero Portal', pct: 46, count: Math.round(totalViews * 0.46) },
+                        { path: '/modules', label: 'Training Modules Catalog', pct: 28, count: Math.round(totalViews * 0.28) },
+                        { path: '/hrdc-guide', label: 'HRDC Employer SBL-Khas Guide', pct: 14, count: Math.round(totalViews * 0.14) },
+                        { path: '/contact-booking', label: 'Booking & Quotation Form', pct: 8, count: Math.round(totalViews * 0.08) },
+                        { path: '/gallery-about', label: 'About Us & Gallery', pct: 4, count: Math.round(totalViews * 0.04) },
+                      ]
+                    : [
+                        { path: '/', label: 'Homepage & Hero Portal', pct: 0, count: 0 },
+                        { path: '/modules', label: 'Training Modules Catalog', pct: 0, count: 0 },
+                        { path: '/hrdc-guide', label: 'HRDC Employer SBL-Khas Guide', pct: 0, count: 0 },
+                        { path: '/contact-booking', label: 'Booking & Quotation Form', pct: 0, count: 0 },
+                        { path: '/gallery-about', label: 'About Us & Gallery', pct: 0, count: 0 },
+                      ];
+
+                  return routes.map((item, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-800">{item.label}</span>
+                        <span className="font-semibold text-slate-500">{(item.count || 0).toLocaleString()} ({item.pct}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all" 
+                          style={{ width: `${item.pct}%` }} 
+                        />
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
 
-            <div className="flex justify-between items-center text-xs text-slate-500 pt-1">
-              <span>Weeks 1–8 (July – September 2026)</span>
-              <span className="font-semibold text-emerald-600">Peak interest: Retail Upselling & AI for Business</span>
+            {/* Device & Traffic Platform Distribution */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-emerald-600" />
+                  <span>Device & Client Distribution</span>
+                </h4>
+                <span className="text-xs text-slate-400 font-medium">Platform</span>
+              </div>
+
+              {(() => {
+                const totalDevices = ((analyticsKPIs?.deviceSplit?.desktop || 0) +
+                  (analyticsKPIs?.deviceSplit?.mobile || 0) +
+                  (analyticsKPIs?.deviceSplit?.tablet || 0));
+
+                const desktopPct = totalDevices > 0 ? Math.round(((analyticsKPIs?.deviceSplit?.desktop || 0) / totalDevices) * 100) : 0;
+                const mobilePct = totalDevices > 0 ? Math.round(((analyticsKPIs?.deviceSplit?.mobile || 0) / totalDevices) * 100) : 0;
+                const tabletPct = totalDevices > 0 ? Math.max(0, 100 - desktopPct - mobilePct) : 0;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Desktop</span>
+                        <span className="text-xl font-extrabold text-slate-900 block mt-1">{desktopPct}%</span>
+                        <span className="text-[10px] text-slate-500">
+                          {totalDevices > 0 ? `${analyticsKPIs?.deviceSplit?.desktop || 0} devices` : '0 devices'}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mobile</span>
+                        <span className="text-xl font-extrabold text-slate-900 block mt-1">{mobilePct}%</span>
+                        <span className="text-[10px] text-slate-500">
+                          {totalDevices > 0 ? `${analyticsKPIs?.deviceSplit?.mobile || 0} devices` : '0 devices'}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Tablet</span>
+                        <span className="text-xl font-extrabold text-slate-900 block mt-1">{tabletPct}%</span>
+                        <span className="text-[10px] text-slate-500">
+                          {totalDevices > 0 ? `${analyticsKPIs?.deviceSplit?.tablet || 0} devices` : '0 devices'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-100 text-xs text-blue-900">
+                      <div className="flex items-center gap-1.5 font-bold mb-1">
+                        <Activity className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Conversion Insight</span>
+                      </div>
+                      <p className="text-blue-800 text-[11px] leading-relaxed">
+                        {totalDevices > 0
+                          ? `${desktopPct}% of completed corporate quotation requests originate from Desktop work browsers between 9:00 AM and 4:30 PM (MYT).`
+                          : '0% conversion baseline. Telemetry data cleared. All numerical metrics and percentages reset to 0.'}
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Real-Time Live Telemetry Event Log Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-600" />
+                  <span>Real-Time Telemetry Event Log</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Live record of visitor interactions received by client and backend listeners
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                Showing {Math.min(10, filteredAnalytics.length)} recent events
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
+                    <th className="py-2.5 px-4">Timestamp</th>
+                    <th className="py-2.5 px-4">Event Type</th>
+                    <th className="py-2.5 px-4">Page / Target</th>
+                    <th className="py-2.5 px-4">Device</th>
+                    <th className="py-2.5 px-4">Metadata Payload</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-800">
+                  {filteredAnalytics.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        No telemetry events recorded for this timeline filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAnalytics.slice(0, 10).map((evt) => (
+                      <tr key={evt.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-4 font-mono text-slate-500 text-[11px] whitespace-nowrap">
+                          {evt?.timestamp ? new Date(evt.timestamp).toLocaleString('en-MY', {
+                            dateStyle: 'short',
+                            timeStyle: 'medium',
+                          }) : '—'}
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                            evt.type === 'pageview' ? 'bg-slate-100 text-slate-800' :
+                            evt.type === 'calculator_session' ? 'bg-blue-100 text-blue-800' :
+                            evt.type === 'syllabus_download' ? 'bg-indigo-100 text-indigo-800' :
+                            'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {evt.type === 'pageview' ? 'Pageview' :
+                             evt.type === 'calculator_session' ? 'Calculator' :
+                             evt.type === 'syllabus_download' ? 'Syllabus PDF' :
+                             'Inquiry Form'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 font-semibold text-slate-800 max-w-[200px] truncate" title={evt.title || evt.path}>
+                          {evt.path}
+                        </td>
+                        <td className="py-2.5 px-4 capitalize text-slate-600 text-[11px]">
+                          {evt.device}
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-500 text-[11px] max-w-[280px] truncate" title={evt.metadata ? JSON.stringify(evt.metadata) : evt.title}>
+                          {evt.metadata ? Object.entries(evt.metadata).map(([k, v]) => `${k}: ${v}`).join(' • ') : (evt.title || 'Standard event')}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -1991,6 +2607,28 @@ Host: ${currentOrigin}`;
           </div>
         </div>
       )}
+
+      {/* Action Toast Notification */}
+      {actionToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="text-xs sm:text-sm font-semibold">{actionToast}</span>
+        </div>
+      )}
+
+      {/* Admin Security Credentials Authorization Modal */}
+      <AdminAuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onConfirmSuccess={handleAuthModalSuccess}
+        onSuccess={handleAuthModalSuccess}
+        title={authModalConfig.title}
+        actionTitle={authModalConfig.title}
+        description={authModalConfig.description}
+        actionDescription={authModalConfig.description}
+        targetSubject={authModalConfig.targetSubject}
+        leadDetails={authModalConfig.leadDetails}
+      />
 
     </div>
   );

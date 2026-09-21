@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PageRoute } from '../types';
 import { useContent } from '../context/ContentContext';
+import { trackAnalyticsEvent } from '../services/analyticsService';
 
 interface HrdcCalculatorProps {
   onNavigate: (route: PageRoute) => void;
@@ -165,7 +166,7 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
                 Average Monthly Salary (MYR)
               </label>
               <span className="text-sm font-black text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md">
-                RM {avgSalary.toLocaleString()}
+                RM {(avgSalary || 0).toLocaleString()}
               </span>
             </div>
             <input
@@ -227,10 +228,10 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
               Estimated Annual HRD Corp Accrual
             </span>
             <div className="text-2xl sm:text-3xl font-black text-white mt-1">
-              RM {annualLevy.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              RM {(annualLevy || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Based on 1% statutory levy (~RM {monthlyLevy.toLocaleString(undefined, { maximumFractionDigits: 0 })}/month).
+              Based on 1% statutory levy (~RM {(monthlyLevy || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}/month).
             </p>
           </div>
 
@@ -239,7 +240,7 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
             <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
               <span className="text-slate-300">Allowable Course Fee Grant:</span>
               <strong className="text-white text-sm">
-                RM {allowableFee.toLocaleString()}
+                RM {(allowableFee || 0).toLocaleString()}
               </strong>
             </div>
 
@@ -247,7 +248,7 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
               <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
                 <span className="text-slate-300">Allowable Meal Subsidy:</span>
                 <strong className="text-emerald-400 text-sm">
-                  + RM {allowableMealAllowance.toLocaleString()}
+                  + RM {(allowableMealAllowance || 0).toLocaleString()}
                 </strong>
               </div>
             )}
@@ -255,7 +256,7 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
             <div className="flex justify-between items-center py-2 bg-blue-950/60 px-3 rounded-lg border border-blue-800/40">
               <span className="text-blue-200 font-bold">Total Claimable Value:</span>
               <strong className="text-emerald-300 text-base font-black">
-                RM {totalGrantClaimable.toLocaleString()}
+                RM {(totalGrantClaimable || 0).toLocaleString()}
               </strong>
             </div>
 
@@ -274,7 +275,7 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
               <span>Projected 6-Month Productivity Dividend</span>
             </div>
             <p className="text-sm font-black text-white">
-              ~ RM {projectedProductivityVal.toLocaleString()}
+              ~ RM {(projectedProductivityVal || 0).toLocaleString()}
             </p>
             <p className="text-[10px] text-slate-400 mt-1 leading-snug">
               Estimated organizational gain from reduced friction, improved retail upselling, and automated workflows.
@@ -283,7 +284,21 @@ export const HrdcCalculator: React.FC<HrdcCalculatorProps> = ({ onNavigate }) =>
 
           {/* Direct CTA */}
           <button
-            onClick={() => onNavigate('contact-booking')}
+            onClick={() => {
+              trackAnalyticsEvent({
+                type: 'calculator_session',
+                path: '/',
+                title: 'HRDC SBL-Khas Grant Calculator Session',
+                metadata: {
+                  employeeCount,
+                  avgSalary,
+                  paxToTrain,
+                  trainingType,
+                  totalGrantClaimable,
+                },
+              });
+              onNavigate('contact-booking');
+            }}
             className="w-full flex items-center justify-center gap-2 btn-cobalt py-4 px-4 text-xs font-extrabold tracking-wider shadow-lg cursor-pointer"
           >
             <span>Lock In SBL-Khas Grant Allocation</span>

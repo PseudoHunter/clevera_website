@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TrainingModule, PageRoute } from '../types';
+import { trackAnalyticsEvent } from '../services/analyticsService';
 import { 
   X, 
   Clock, 
@@ -33,6 +34,16 @@ export const SyllabusModal: React.FC<SyllabusModalProps> = ({
 
   const handleDownloadPDF = () => {
     setDownloading(true);
+    trackAnalyticsEvent({
+      type: 'syllabus_download',
+      path: '/modules',
+      title: `Syllabus Outline: ${module.title}`,
+      metadata: {
+        moduleId: module.id,
+        moduleTitle: module.title,
+        pax: module.recommendedPax,
+      },
+    });
     setTimeout(() => {
       setDownloading(false);
       setDownloadSuccess(true);

@@ -24,6 +24,7 @@ import { LegalPages } from './pages/LegalPages';
 import { LogoProvider } from './context/LogoContext';
 import { ContentProvider, useContent } from './context/ContentContext';
 import { AdminLogoModal } from './components/AdminLogoModal';
+import { trackAnalyticsEvent } from './services/analyticsService';
 
 // Route extraction supporting direct URL path /admin and hash fallbacks
 const getRouteFromUrl = (): PageRoute => {
@@ -300,12 +301,55 @@ export default function App() {
       terms: 'Terms of Service | Clevera Academy Malaysia',
       '404': 'Page Not Found | Clevera Academy Malaysia',
     };
-    document.title = titleMap[currentRoute] || titleMap.home;
+    const activeTitle = titleMap[currentRoute] || titleMap.home;
+    document.title = activeTitle;
+
+    // Track live pageview telemetry event
+    trackAnalyticsEvent({
+      type: 'pageview',
+      path: currentRoute === 'home' ? '/' : `/${currentRoute}`,
+      title: activeTitle,
+    });
   }, [currentRoute]);
 
-  // Lead Submission Handler
+  // Lead Submission Handler with Live Telemetry
   const handleLeadSubmitted = (newLead: CorporateInquiry) => {
     const updated = [newLead, ...leads];
+    setLeads(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('clevera_corporate_leads', JSON.stringify(updated));
+    }
+    // Track live inquiry submission event
+    trackAnalyticsEvent({
+      type: 'inquiry_submission',
+      path: '/contact-booking',
+      title: `Inquiry: ${newLead.companyName}`,
+      metadata: {
+        inquiryId: newLead.id,
+        company: newLead.companyName,
+        pax: newLead.participantsCount,
+        module: newLead.moduleTitle,
+        format: newLead.trainingFormat,
+      },
+    });
+  };
+
+  // Reset Corporate Inquiries (Enforced via Admin Credentials Verification)
+  const handleResetLeads = (mode: 'empty' | 'benchmark') => {
+    const updated = mode === 'empty' ? [] : INITIAL_LEADS;
+    setLeads(updated);
+    if (typeof window !== 'undefined') {
+      if (updated.length === 0) {
+        localStorage.setItem('clevera_corporate_leads', JSON.stringify([]));
+      } else {
+        localStorage.setItem('clevera_corporate_leads', JSON.stringify(INITIAL_LEADS));
+      }
+    }
+  };
+
+  // Delete Single Inquiry (Enforced via Admin Credentials Verification)
+  const handleDeleteSingleLead = (id: string) => {
+    const updated = leads.filter(l => l.id !== id);
     setLeads(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem('clevera_corporate_leads', JSON.stringify(updated));
@@ -421,6 +465,8 @@ export default function App() {
             leads={leads}
             onUpdateLeadStatus={handleUpdateLeadStatus}
             onAssignLeadRep={handleAssignLeadRep}
+            onResetLeads={handleResetLeads}
+            onDeleteSingleLead={handleDeleteSingleLead}
             announcement={announcement}
             onUpdateAnnouncement={handleUpdateAnnouncement}
             onOpenLogoModal={() => setIsLogoModalOpen(true)}

@@ -32,11 +32,20 @@ const activeSessions = new Map<string, AdminSession>();
 // Failed login attempts indexed by IP
 const failedLoginAttempts = new Map<string, FailedAttemptRecord>();
 
-// Security Audit Log (most recent 50 entries)
+// Security Audit Log (most recent 100 entries)
 interface AuditLogEntry {
   id: string;
   timestamp: string;
-  type: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'RATE_LIMITED' | 'LOGOUT' | 'SESSION_EXPIRED';
+  type: 
+    | 'LOGIN_SUCCESS' 
+    | 'LOGIN_FAILURE' 
+    | 'RATE_LIMITED' 
+    | 'LOGOUT' 
+    | 'SESSION_EXPIRED'
+    | 'INQUIRIES_RESET'
+    | 'ANALYTICS_RESET'
+    | 'CREDENTIAL_VERIFY_FAILURE'
+    | 'CREDENTIAL_VERIFY_SUCCESS';
   ip: string;
   username: string;
   details?: string;
@@ -275,6 +284,170 @@ app.get("/api/admin/audit-log", (req: Request, res: Response) => {
     logs: securityAuditLog,
     activeSessionsCount: activeSessions.size,
     lockedIpsCount: failedLoginAttempts.size,
+  });
+});
+
+// -------------------------------------------------------------
+// STRICT CREDENTIAL CONFIRMATION FOR DELETION / RESET ACTIONS
+// -------------------------------------------------------------
+app.post("/api/admin/verify-credentials", (req: Request, res: Response) => {
+  const ip = getClientIp(req);
+  const now = Date.now();
+
+  // Check rate limiting / lockout for this IP
+  const attemptRecord = failedLoginAttempts.get(ip);
+  if (attemptRecord && attemptRecord.lockedUntil && attemptRecord.lockedUntil > now) {
+    const remainingSeconds = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
+    logSecurityEvent('RATE_LIMITED', ip, req.body?.username || 'unknown', `Verification locked for ${remainingSeconds}s`);
+    res.status(429).json({
+      valid: false,
+      error: `Security lockout active due to excessive failed attempts. Try again in ${remainingSeconds}s.`,
+      remainingSeconds,
+    });
+    return;
+  }
+
+  const { username, password, action } = req.body || {};
+  const cleanUsername = String(username || '').trim().toLowerCase();
+  const cleanPassword = String(password || '').trim();
+
+  const isUsernameValid = cleanUsername === ADMIN_CREDENTIALS.username.toLowerCase() || cleanUsername === 'cleveraadminhebat';
+  const isPasswordValid = cleanPassword === ADMIN_CREDENTIALS.password;
+
+  if (!isUsernameValid || !isPasswordValid) {
+    const current = failedLoginAttempts.get(ip) || { count: 0, firstAttemptAt: now, lockedUntil: null };
+    current.count += 1;
+    failedLoginAttempts.set(ip, current);
+
+    const attemptsLeft = Math.max(0, MAX_FAILED_ATTEMPTS - current.count);
+    logSecurityEvent('CREDENTIAL_VERIFY_FAILURE', ip, cleanUsername || 'unknown', `Failed credential verification for action: ${action || 'unknown'}`);
+
+    res.status(401).json({
+      valid: false,
+      error: `Invalid administrator password. Security verification failed. (${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining)`,
+      attemptsLeft,
+    });
+    return;
+  }
+
+  // Clear failed attempt counter on success
+  failedLoginAttempts.delete(ip);
+  logSecurityEvent('CREDENTIAL_VERIFY_SUCCESS', ip, cleanUsername, `Admin credentials verified for action: ${action || 'general'}`);
+
+  res.json({
+    valid: true,
+    message: "Administrator credentials verified successfully.",
+    verifiedAt: new Date().toISOString(),
+  });
+});
+
+// Admin Inquiries Reset Audit Log & Confirmation
+app.post("/api/admin/reset-inquiries", (req: Request, res: Response) => {
+  const ip = getClientIp(req);
+  const { username, password, mode } = req.body || {};
+
+  const cleanUsername = String(username || '').trim().toLowerCase();
+  const cleanPassword = String(password || '').trim();
+
+  const isAuthorized = (cleanUsername === ADMIN_CREDENTIALS.username.toLowerCase() || cleanUsername === 'cleveraadminhebat') &&
+    cleanPassword === ADMIN_CREDENTIALS.password;
+
+  if (!isAuthorized) {
+    logSecurityEvent('CREDENTIAL_VERIFY_FAILURE', ip, cleanUsername || 'unknown', 'Unauthorized attempt to reset corporate inquiries');
+    res.status(401).json({ success: false, error: "Unauthorized. Valid administrator credentials required." });
+    return;
+  }
+
+  logSecurityEvent('INQUIRIES_RESET', ip, cleanUsername, `Corporate inquiries database reset [Mode: ${mode || 'empty'}]`);
+
+  res.json({
+    success: true,
+    message: `Corporate inquiries successfully reset [Mode: ${mode || 'empty'}].`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Admin Analytics Reset Audit Log & Confirmation
+app.post("/api/admin/reset-analytics", (req: Request, res: Response) => {
+  const ip = getClientIp(req);
+  const { username, password, mode } = req.body || {};
+
+  const cleanUsername = String(username || '').trim().toLowerCase();
+  const cleanPassword = String(password || '').trim();
+
+  const isAuthorized = (cleanUsername === ADMIN_CREDENTIALS.username.toLowerCase() || cleanUsername === 'cleveraadminhebat') &&
+    cleanPassword === ADMIN_CREDENTIALS.password;
+
+  if (!isAuthorized) {
+    logSecurityEvent('CREDENTIAL_VERIFY_FAILURE', ip, cleanUsername || 'unknown', 'Unauthorized attempt to reset analytics telemetry');
+    res.status(401).json({ success: false, error: "Unauthorized. Valid administrator credentials required." });
+    return;
+  }
+
+  // Clear backend telemetry buffer if wiped
+  if (mode === 'empty') {
+    serverTelemetryLog.length = 0;
+  }
+
+  logSecurityEvent('ANALYTICS_RESET', ip, cleanUsername, `Traffic and conversion analytics reset [Mode: ${mode || 'empty'}]`);
+
+  res.json({
+    success: true,
+    message: `Analytics telemetry successfully reset [Mode: ${mode || 'empty'}].`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// -------------------------------------------------------------
+// LIVE ANALYTICS & TELEMETRY BEACON ENDPOINTS
+// -------------------------------------------------------------
+interface ServerTelemetryEvent {
+  id: string;
+  type: string;
+  timestamp: string;
+  path: string;
+  ip: string;
+  device: string;
+  referrer?: string;
+  metadata?: Record<string, any>;
+}
+
+const serverTelemetryLog: ServerTelemetryEvent[] = [];
+
+app.post("/api/analytics/track", (req: Request, res: Response) => {
+  try {
+    const ip = getClientIp(req);
+    const event = req.body || {};
+
+    const serverEvent: ServerTelemetryEvent = {
+      id: event.id || crypto.randomUUID(),
+      type: event.type || 'pageview',
+      timestamp: event.timestamp || new Date().toISOString(),
+      path: event.path || '/',
+      ip,
+      device: event.device || 'desktop',
+      referrer: event.referrer || 'Direct',
+      metadata: event.metadata,
+    };
+
+    serverTelemetryLog.unshift(serverEvent);
+    if (serverTelemetryLog.length > 500) {
+      serverTelemetryLog.pop();
+    }
+
+    res.json({ received: true, eventId: serverEvent.id });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to record event" });
+  }
+});
+
+app.get("/api/analytics/stats", (_req: Request, res: Response) => {
+  res.json({
+    status: "active",
+    mode: "live_realtime",
+    totalEventsLogged: serverTelemetryLog.length,
+    recentEvents: serverTelemetryLog.slice(0, 15),
+    serverTimestamp: new Date().toISOString(),
   });
 });
 

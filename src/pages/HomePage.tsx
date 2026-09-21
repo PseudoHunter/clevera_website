@@ -509,11 +509,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </span>
                 <p className="text-sm font-semibold text-slate-900">
                   <a href={`tel:${contactConfig.primaryPhone.replace(/\s+/g, '')}`} className="hover:text-[#3430eb] transition-colors">
-                    {contactConfig.primaryPhone} ({contactConfig.phoneLabel})
+                    {contactConfig.primaryPhone}{contactConfig.phoneLabel?.trim() ? ` (${contactConfig.phoneLabel.trim()})` : ''}
                   </a>
                   <span className="text-slate-400 mx-2">&bull;</span>
                   <a href={contactConfig.whatsappUrl} target="_blank" rel="noreferrer" className="text-[#3430eb] hover:underline font-bold">
-                    {contactConfig.whatsappNumber} ({contactConfig.whatsappLabel})
+                    {contactConfig.whatsappNumber}{contactConfig.whatsappLabel?.trim() ? ` (${contactConfig.whatsappLabel.trim()})` : ''}
                   </a>
                 </p>
               </div>
