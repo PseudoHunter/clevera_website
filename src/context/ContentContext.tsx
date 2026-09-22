@@ -22,6 +22,10 @@ import {
   DEFAULT_CLIENT_LOGOS,
   DEFAULT_TRUSTED_BY_CONFIG
 } from '../data/clientLogosData';
+import { 
+  fetchLiveModulesFromGoogleSheets, 
+  publishModulesToGoogleSheetsApi 
+} from '../services/googleSheetsService';
 
 export const DEFAULT_SECTION_VISIBILITY: SectionVisibility = {
   hero: true,
@@ -148,6 +152,13 @@ interface ContentContextType {
 
   // Master Global Reset
   resetAllContent: () => void;
+
+  // Google Sheets Live Sync
+  isSheetsLoading: boolean;
+  isPublishingToSheets: boolean;
+  lastSheetsSyncTime: string | null;
+  publishModulesToSheets: () => Promise<{ success: boolean; message: string }>;
+  refreshModulesFromSheets: () => Promise<boolean>;
 
   // Quick navigation target for admin editor
   adminEditorTargetTab: AdminContentSubTab | null;
@@ -308,6 +319,69 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [adminEditorTargetTab, setAdminEditorTargetTab] = useState<AdminContentSubTab | null>(null);
+
+  // Google Sheets Live Integration State
+  const [isSheetsLoading, setIsSheetsLoading] = useState<boolean>(false);
+  const [isPublishingToSheets, setIsPublishingToSheets] = useState<boolean>(false);
+  const [lastSheetsSyncTime, setLastSheetsSyncTime] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('clevera_sheets_last_sync');
+    }
+    return null;
+  });
+
+  // 1. Public Page Data Fetching (useEffect):
+  // On initial page load, fetch the live modules array from Google Sheets.
+  // If data exists, display the live modules from Google Sheets across the website.
+  // Fall back to local defaults if loading or offline.
+  const refreshModulesFromSheets = async (): Promise<boolean> => {
+    setIsSheetsLoading(true);
+    try {
+      const liveModules = await fetchLiveModulesFromGoogleSheets();
+      if (liveModules && Array.isArray(liveModules) && liveModules.length > 0) {
+        setModules(liveModules);
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastSheetsSyncTime(now);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('clevera_sheets_last_sync', now);
+          localStorage.setItem('clevera_modules_v2', JSON.stringify(liveModules));
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('[ContentContext] Live Google Sheets sync fallback to local cache:', err);
+    } finally {
+      setIsSheetsLoading(false);
+    }
+    return false;
+  };
+
+  const publishModulesToSheets = async (): Promise<{ success: boolean; message: string }> => {
+    setIsPublishingToSheets(true);
+    try {
+      const result = await publishModulesToGoogleSheetsApi(modules);
+      if (result.success) {
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastSheetsSyncTime(now);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('clevera_sheets_last_sync', now);
+        }
+      }
+      return result;
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Failed to publish modules to Google Sheets'
+      };
+    } finally {
+      setIsPublishingToSheets(false);
+    }
+  };
+
+  // Initial mount: Fetch live modules from Google Sheets
+  useEffect(() => {
+    refreshModulesFromSheets();
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -596,6 +670,12 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         resetSectionVisibility,
 
         resetAllContent,
+
+        isSheetsLoading,
+        isPublishingToSheets,
+        lastSheetsSyncTime,
+        publishModulesToSheets,
+        refreshModulesFromSheets,
 
         adminEditorTargetTab,
         setAdminEditorTargetTab,

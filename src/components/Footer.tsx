@@ -240,10 +240,10 @@ export const Footer: React.FC<FooterProps> = ({
                 <Phone className="w-4 h-4 text-blue-400 shrink-0" />
                 <div>
                   <a href={`tel:${contactConfig.primaryPhone.replace(/\s+/g, '')}`} className="hover:text-white transition-colors block">
-                    {contactConfig.primaryPhone} ({contactConfig.phoneLabel})
+                    {contactConfig.primaryPhone}{contactConfig.phoneLabel?.trim() ? ` (${contactConfig.phoneLabel.trim()})` : ''}
                   </a>
                   <a href={contactConfig.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors text-[11px] text-slate-400">
-                    {contactConfig.whatsappNumber} ({contactConfig.whatsappLabel})
+                    {contactConfig.whatsappNumber}{contactConfig.whatsappLabel?.trim() ? ` (${contactConfig.whatsappLabel.trim()})` : ''}
                   </a>
                 </div>
               </div>

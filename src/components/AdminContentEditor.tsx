@@ -36,7 +36,10 @@ import {
   Sliders,
   Eye,
   Zap,
-  X
+  X,
+  Loader2,
+  FileSpreadsheet,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminContentEditorProps {
@@ -105,10 +108,44 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
     resetAllContent,
     adminEditorTargetTab,
     setAdminEditorTargetTab,
+
+    isSheetsLoading,
+    isPublishingToSheets,
+    lastSheetsSyncTime,
+    publishModulesToSheets,
+    refreshModulesFromSheets,
   } = useContent();
 
   const [activeSubTab, setActiveSubTab] = useState<AdminContentSubTab>(adminEditorTargetTab || initialTab);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handlePublishToGoogleSheets = async () => {
+    try {
+      const result = await publishModulesToSheets();
+      if (result.success) {
+        window.alert(result.message || 'All module catalog updates have been published to Google Sheets successfully!');
+        setToastMessage('Published module updates to Google Sheets successfully!');
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        window.alert(`Error publishing to Google Sheets: ${result.message}`);
+        setToastMessage(`Failed to publish: ${result.message}`);
+        setTimeout(() => setToastMessage(null), 5000);
+      }
+    } catch (err: any) {
+      window.alert(`Unexpected error: ${err?.message || 'Failed to publish to Google Sheets'}`);
+    }
+  };
+
+  const handleRefreshFromSheets = async () => {
+    const success = await refreshModulesFromSheets();
+    if (success) {
+      setToastMessage('Fetched live module catalog from Google Sheets!');
+      setTimeout(() => setToastMessage(null), 3000);
+    } else {
+      setToastMessage('Could not fetch from Google Sheets; using local catalog.');
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
 
   // Search queries for lists
   const [moduleSearch, setModuleSearch] = useState('');
@@ -852,7 +889,48 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
       {/* ========================================================================= */}
       {activeSubTab === 'modules' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Google Sheets Live Database Connection Banner */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900 tracking-tight">
+                    Google Sheets Live Database Integration
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Sheet: "Modules" Live
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Published catalog changes automatically propagate across all public visitor pages for <span className="font-semibold text-slate-800">cleveraacademy.my</span>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {lastSheetsSyncTime && (
+                <span className="text-[11px] text-slate-500 font-medium px-2.5 py-1.5 bg-white/80 rounded-xl border border-slate-200">
+                  Last Synced: <strong className="text-slate-800">{lastSheetsSyncTime}</strong>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleRefreshFromSheets}
+                disabled={isSheetsLoading}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-emerald-700 bg-white hover:bg-emerald-50 border border-slate-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Fetch latest module catalog from Google Sheets"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSheetsLoading ? 'animate-spin text-emerald-600' : ''}`} />
+                <span>{isSheetsLoading ? 'Fetching...' : 'Pull Live from Sheets'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1 relative max-w-md">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -864,7 +942,30 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
+              <button
+                onClick={handlePublishToGoogleSheets}
+                disabled={isPublishingToSheets}
+                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer ${
+                  isPublishingToSheets
+                    ? 'bg-emerald-700 text-white cursor-wait opacity-90'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white hover:shadow-md'
+                }`}
+                title="Save and publish updated modules array directly to live Google Sheet"
+              >
+                {isPublishingToSheets ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Publishing to Google Sheets...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+                    <span>Publish Updates to Google Sheets</span>
+                  </>
+                )}
+              </button>
+
               <button
                 onClick={() => {
                   if (window.confirm('Reset all modules to initial course catalog?')) {
