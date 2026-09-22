@@ -90,7 +90,7 @@ function getClientIp(req: Request): string {
 //   password: cleveranumber1
 // -------------------------------------------------------------
 const ADMIN_CREDENTIALS = {
-  username: 'admincleverahebat',
+  username: 'alif@cleveraacademy.my',
   password: 'cleveranumber1',
   role: 'Super Administrator',
 };
@@ -145,7 +145,7 @@ app.post("/api/admin/login", (req: Request, res: Response) => {
   const cleanPassword = String(password).trim();
 
   // Strict credential check
-  const isUsernameValid = cleanUsername.toLowerCase() === ADMIN_CREDENTIALS.username.toLowerCase() || cleanUsername.toLowerCase() === 'cleveraadminhebat';
+  const isUsernameValid = cleanUsername.toLowerCase() === ADMIN_CREDENTIALS.username.toLowerCase();
   const isPasswordValid = cleanPassword === ADMIN_CREDENTIALS.password;
 
   if (!isUsernameValid || !isPasswordValid) {
@@ -477,6 +477,30 @@ app.get("/api/sheets/modules", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[GOOGLE SHEETS PROXY] Fetch error:", error);
     return res.status(200).json([]);
+  }
+});
+
+app.post("/api/sheets/save-section", async (req: Request, res: Response) => {
+  try {
+    const payload = req.body || {};
+    const outgoing = {
+      secret: CLEVERA_SECRET_KEY,
+      sheet: payload.sheet,
+      action: payload.action || 'updateSection',
+      data: Array.isArray(payload.data) ? payload.data : [],
+    };
+    const fetchRes = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(outgoing),
+    });
+    const text = await fetchRes.text();
+    let parsed: any;
+    try { parsed = JSON.parse(text); } catch { parsed = { status: fetchRes.ok ? 'success' : 'error', raw: text }; }
+    return res.status(fetchRes.ok ? 200 : 502).json(parsed);
+  } catch (error) {
+    console.error('[GOOGLE SHEETS PROXY] Section save error:', error);
+    return res.status(500).json({ error: 'Network error updating Google Sheets' });
   }
 });
 

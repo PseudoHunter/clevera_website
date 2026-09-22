@@ -88,7 +88,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       // Offline / fallback verification
       const cleanUser = username.trim().toLowerCase();
       const cleanPass = password.trim();
-      const isValid = (cleanUser === 'admincleverahebat' || cleanUser === 'cleveraadminhebat') && cleanPass === 'cleveranumber1';
+      const isValid = cleanUser === 'alif@cleveraacademy.my' && cleanPass === 'cleveranumber1';
 
       if (isValid) {
         handleCallbackSuccess(resetMode);

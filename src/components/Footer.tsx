@@ -289,6 +289,12 @@ export const Footer: React.FC<FooterProps> = ({
             >
               Terms & Conditions
             </button>
+            <button
+              onClick={() => onNavigate('admin')}
+              className="hover:text-blue-300 transition-colors font-semibold"
+            >
+              Admin Login
+            </button>
           </div>
         </div>
       </div>
