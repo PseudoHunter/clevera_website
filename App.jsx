@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
-// Replace with your Google Apps Script URL from Step 1
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+// https://script.google.com/macros/s/AKfycbxK4noqYSdtIFv4kc8BjMvnTLAsPw8EdE2aFIxpFPbjL_yOkeuLtfR_kfbFy9Ys1F3h/exec
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxK4noqYSdtIFv4kc8BjMvnTLAsPw8EdE2aFIxpFPbjL_yOkeuLtfR_kfbFy9Ys1F3h/exec";
 
 export default function App() {
   const [dbData, setDbData] = useState({});
@@ -11,7 +11,7 @@ export default function App() {
   useEffect(() => {
     async function fetchSiteData() {
       try {
-        const response = await fetch(GOOGLE_SCRIPT_URL);
+        const response = await fetch(https://script.google.com/macros/s/AKfycbxK4noqYSdtIFv4kc8BjMvnTLAsPw8EdE2aFIxpFPbjL_yOkeuLtfR_kfbFy9Ys1F3h/exec);
         const data = await response.json();
         setDbData(data);
       } catch (error) {
