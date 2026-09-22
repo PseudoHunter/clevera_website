@@ -3,7 +3,7 @@ import { TRAINING_MODULES } from '../data/mockData';
 
 export const GOOGLE_APPS_SCRIPT_URL = 
   "https://script.google.com/macros/s/AKfycbyMBsOnsNY0bpL_vSr_UEzZvVSgSxXCHsN9-oTHJa7kNYXj4aUe_EQXqchqHLu0D5JT/exec";
-export const CLEVERA_SECRET_KEY = "CLEVERA_SECRET_KEY_2026";
+// The secret stays on the server; the proxy injects process.env.secret before forwarding.
 
 /**
  * Maps raw rows returned by Google Sheets into clean, type-safe TrainingModule objects.
@@ -165,7 +165,6 @@ export async function publishModulesToGoogleSheetsApi(
   modules: TrainingModule[]
 ): Promise<{ success: boolean; message: string }> {
   const payload = {
-    secret: CLEVERA_SECRET_KEY,
     sheet: 'Modules',
     action: 'updateModules',
     modules: modules.map(m => ({
