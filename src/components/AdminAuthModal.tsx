@@ -351,3 +351,116 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     </div>
   );
 };
+const saveSectionData = async (sheetName, updatedDataArray) => {
+  try {
+    const response = await fetch(https://script.google.com/macros/s/AKfycbxK4noqYSdtIFv4kc8BjMvnTLAsPw8EdE2aFIxpFPbjL_yOkeuLtfR_kfbFy9Ys1F3h/exec, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        secret: "CLEVERA_SECRET_KEY_2026", // Matches key in Apps Script
+        action: "updateSheet",
+        sheetName: sheetName,
+        data: updatedDataArray
+      })
+    });
+
+    const result = await response.json();
+    if (result.status === "success") {
+      alert(`Published updates for ${sheetName} live to all visitors!`);
+    } else {
+      alert("Error saving: " + result.message);
+    }
+  } catch (error) {
+    console.error("Save failed:", error);
+    alert("Connection error while saving to Google Sheets.");
+  }
+};
+export function AdminSectionVisibilityManager({ visibilityData, onSave }) {
+  const [sections, setSections] = useState(visibilityData || []);
+
+  const handleToggle = (sectionId) => {
+    const updated = sections.map((item) => {
+      if (item.section_id === sectionId) {
+        return { ...item, is_visible: item.is_visible === "true" ? "false" : "true" };
+      }
+      return item;
+    });
+    setSections(updated);
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow border">
+      <h2 className="text-xl font-bold mb-4">Homepage Section Visibility Controls</h2>
+      <div className="space-y-3 mb-6">
+        {sections.map((sec) => (
+          <div key={sec.section_id} className="flex items-center justify-between p-3 border rounded">
+            <span className="font-medium text-slate-700">{sec.section_name}</span>
+            <button
+              onClick={() => handleToggle(sec.section_id)}
+              className={`px-4 py-1.5 rounded-full font-bold text-sm ${
+                sec.is_visible === "true" ? "bg-green-600 text-white" : "bg-gray-300 text-gray-700"
+              }`}
+            >
+              {sec.is_visible === "true" ? "Visible" : "Hidden"}
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => onSave("Section_Visibility", sections)}
+        className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+      >
+        Publish Visibility Changes
+      </button>
+    </div>
+  );
+}
+export function AdminTrainerEditor({ trainersData, onSave }) {
+  const [trainers, setTrainers] = useState(trainersData || []);
+
+  const updateTrainerField = (index, field, value) => {
+    const updated = [...trainers];
+    updated[index][field] = value;
+    setTrainers(updated);
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow border mt-6">
+      <h2 className="text-xl font-bold mb-4">Trainer & Faculty Directory Manager</h2>
+      {trainers.map((trainer, idx) => (
+        <div key={idx} className="p-4 border rounded mb-4 bg-slate-50 space-y-3">
+          <input
+            type="text"
+            placeholder="Trainer Name"
+            value={trainer.name || ""}
+            onChange={(e) => updateTrainerField(idx, "name", e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+          <input
+            type="text"
+            placeholder="Role / Title"
+            value={trainer.role || ""}
+            onChange={(e) => updateTrainerField(idx, "role", e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+          <input
+            type="text"
+            placeholder="Image URL (Unsplash or hosted link)"
+            value={trainer.image_url || ""}
+            onChange={(e) => updateTrainerField(idx, "image_url", e.target.value)}
+            className="w-full p-2 border rounded"
+          />
+          {trainer.image_url && (
+            <img src={trainer.image_url} alt="Preview" className="h-16 w-16 object-cover rounded-full" />
+          )}
+        </div>
+      ))}
+      <button
+        onClick={() => onSave("Trainers", trainers)}
+        className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+      >
+        Publish Trainer Directory Updates
+      </button>
+    </div>
+  );
+}
