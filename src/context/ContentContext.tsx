@@ -94,6 +94,7 @@ interface ContentContextType {
   addModule: (module: TrainingModule) => void;
   deleteModule: (id: string) => void;
   resetModules: () => void;
+  publishModulesToGoogleSheets: () => Promise<void>;
 
   // 2. Trainers
   trainers: Trainer[];
@@ -309,6 +310,35 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [adminEditorTargetTab, setAdminEditorTargetTab] = useState<AdminContentSubTab | null>(null);
 
+  const googleSheetsUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEB_APP_URL as string | undefined;
+
+  // Load the published catalog for every visitor, while retaining local/default content offline.
+  useEffect(() => {
+    if (!googleSheetsUrl || googleSheetsUrl === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') return;
+
+    const controller = new AbortController();
+    fetch(`${googleSheetsUrl}?sheet=Modules`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Modules request failed (${response.status})`);
+        const payload: unknown = await response.json();
+        const liveModules = Array.isArray(payload)
+          ? payload
+          : payload && typeof payload === 'object' && Array.isArray((payload as { modules?: unknown }).modules)
+            ? (payload as { modules: unknown[] }).modules
+            : null;
+        if (liveModules && liveModules.length > 0) {
+          setModules(liveModules as TrainingModule[]);
+        }
+      })
+      .catch((error: unknown) => {
+        if ((error as Error).name !== 'AbortError') {
+          console.warn('Using local module defaults because Google Sheets is unavailable.', error);
+        }
+      });
+
+    return () => controller.abort();
+  }, [googleSheetsUrl]);
+
   // Sync to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -388,6 +418,23 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (typeof window !== 'undefined') {
       localStorage.removeItem('clevera_modules_v2');
     }
+  };
+
+  const publishModulesToGoogleSheets = async () => {
+    const secret = import.meta.env.VITE_GOOGLE_SHEETS_SECRET as string | undefined;
+    if (!googleSheetsUrl || googleSheetsUrl === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+      throw new Error('Google Apps Script URL is not configured.');
+    }
+    if (!secret || secret === 'YOUR_GOOGLE_APPS_SCRIPT_SECRET') {
+      throw new Error('Google Sheets secret is not configured.');
+    }
+
+    const response = await fetch(googleSheetsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ secret, sheet: 'Modules', action: 'updateModules', modules }),
+    });
+    if (!response.ok) throw new Error(`Publish failed (${response.status})`);
   };
 
   // 2. Trainers CRUD
@@ -551,6 +598,7 @@ export const ContentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addModule,
         deleteModule,
         resetModules,
+        publishModulesToGoogleSheets,
 
         trainers,
         updateTrainer,

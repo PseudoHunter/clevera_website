@@ -36,7 +36,9 @@ import {
   Sliders,
   Eye,
   Zap,
-  X
+  X,
+  CloudUpload,
+  Loader2
 } from 'lucide-react';
 
 interface AdminContentEditorProps {
@@ -58,6 +60,7 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
     addModule,
     deleteModule,
     resetModules,
+    publishModulesToGoogleSheets,
 
     trainers,
     updateTrainer,
@@ -109,6 +112,7 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
 
   const [activeSubTab, setActiveSubTab] = useState<AdminContentSubTab>(adminEditorTargetTab || initialTab);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isPublishingModules, setIsPublishingModules] = useState(false);
 
   // Search queries for lists
   const [moduleSearch, setModuleSearch] = useState('');
@@ -876,6 +880,27 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Modules</span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  setIsPublishingModules(true);
+                  try {
+                    await publishModulesToGoogleSheets();
+                    window.alert('Module updates have been published to Google Sheets successfully.');
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Unable to publish module updates.';
+                    showToast(message);
+                  } finally {
+                    setIsPublishingModules(false);
+                  }
+                }}
+                disabled={isPublishingModules}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Publish the current module catalog to Google Sheets"
+              >
+                {isPublishingModules ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                <span>{isPublishingModules ? 'Publishing...' : 'Publish Updates to Google Sheets'}</span>
               </button>
 
               <button
