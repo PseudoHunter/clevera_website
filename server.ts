@@ -6,7 +6,8 @@ import { createServer as createViteServer } from "vite";
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // -------------------------------------------------------------
 // IN-MEMORY ADMIN SECURITY & SESSION STORE
