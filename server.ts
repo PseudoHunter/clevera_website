@@ -521,7 +521,10 @@ Host: ${host}`;
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      // The preview is served through Express middleware, so Vite's HMR socket
+      // cannot be upgraded by the standalone app listener. Disable the client
+      // socket here to prevent repeated "WebSocket closed without opened" errors.
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);
