@@ -161,6 +161,21 @@ export async function fetchLiveModulesFromGoogleSheets(): Promise<TrainingModule
 /**
  * Sends POST request to Google Apps Script Web App to publish updated modules array.
  */
+export async function saveSectionData(sheetName: string, dataArray: unknown[]): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch('/api/sheets/save-section', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheet: sheetName, action: 'updateSection', data: dataArray }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Unable to publish section updates.');
+    return { success: true, message: `${sheetName} updates published to Google Sheets.` };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Unable to publish section updates.' };
+  }
+}
+
 export async function publishModulesToGoogleSheetsApi(
   modules: TrainingModule[]
 ): Promise<{ success: boolean; message: string }> {

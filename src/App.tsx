@@ -197,7 +197,7 @@ export default function App() {
 
     if (token.startsWith('fallback-admin-token-')) {
       setIsAdminLoggedIn(true);
-      setAdminUser({ username: 'admincleverahebat', role: 'Super Administrator' });
+      setAdminUser({ username: 'alif@cleveraacademy.my', role: 'Super Administrator' });
       setAdminToken(token);
       return;
     }

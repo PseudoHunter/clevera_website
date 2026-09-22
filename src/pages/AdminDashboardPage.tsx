@@ -315,8 +315,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     } catch (err) {
       const cleanUser = usernameInput.trim().toLowerCase();
       const cleanPass = passwordInput.trim();
-      if ((cleanUser === 'admincleverahebat' || cleanUser === 'cleveraadminhebat') && cleanPass === 'cleveranumber1') {
-        onLogin('fallback-admin-token-' + Date.now(), { username: 'admincleverahebat', role: 'Super Administrator' });
+if (cleanUser === 'alif@cleveraacademy.my' && cleanPass === 'cleveranumber1') {
+  onLogin('fallback-admin-token-' + Date.now(), { username: 'alif@cleveraacademy.my', role: 'Super Administrator' });
         setLoginError('');
       } else {
         setLoginError('Security authentication server unreachable or credentials invalid. Please try again.');

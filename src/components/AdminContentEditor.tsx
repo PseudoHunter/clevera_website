@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { useContent } from '../context/ContentContext';
 import { generateLogoPlaceholder } from '../data/clientLogosData';
+import { saveSectionData } from '../services/googleSheetsService';
 import { 
   BookOpen, 
   Users, 
@@ -38,6 +39,7 @@ import {
   Zap,
   X,
   Loader2,
+  CloudUpload,
   FileSpreadsheet,
   RefreshCw
 } from 'lucide-react';
@@ -136,6 +138,24 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
     }
   };
 
+  const handlePublishActiveSection = async () => {
+    const sectionPayload: Record<string, unknown[]> = {
+      sections: [sectionVisibility],
+      trainers,
+      modules,
+      calculator: [calculatorConfig],
+      testimonials,
+      'trusted-by': clientLogos,
+      contact: [contactConfig],
+      footer: [footerConfig],
+      announcement: [announcement],
+    };
+    const sheetName = `Admin_${activeSubTab}`;
+    const result = await saveSectionData(sheetName, sectionPayload[activeSubTab] || []);
+    if (result.success) window.alert(result.message);
+    showToast(result.message);
+  };
+
   const handleRefreshFromSheets = async () => {
     const success = await refreshModulesFromSheets();
     if (success) {
@@ -221,6 +241,14 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            onClick={handlePublishActiveSection}
+            disabled={isPublishingToSheets}
+            className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            {isPublishingToSheets ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
+            <span>Publish Updates to Google Sheets</span>
+          </button>
           <button
             onClick={() => {
               if (window.confirm('Are you sure you want to reset all site content back to official factory defaults?')) {
