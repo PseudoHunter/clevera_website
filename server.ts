@@ -452,6 +452,67 @@ app.get("/api/analytics/stats", (_req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
+// GOOGLE SHEETS LIVE DATABASE INTEGRATION PROXY
+// -------------------------------------------------------------
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMBsOnsNY0bpL_vSr_UEzZvVSgSxXCHsN9-oTHJa7kNYXj4aUe_EQXqchqHLu0D5JT/exec";
+const CLEVERA_SECRET_KEY = "CLEVERA_SECRET_KEY_2026";
+
+app.get("/api/sheets/modules", async (_req: Request, res: Response) => {
+  try {
+    const fetchRes = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?sheet=Modules`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      },
+      redirect: "follow"
+    });
+    const text = await fetchRes.text();
+    try {
+      const data = JSON.parse(text);
+      return res.json(data);
+    } catch {
+      return res.status(200).json([]);
+    }
+  } catch (error) {
+    console.error("[GOOGLE SHEETS PROXY] Fetch error:", error);
+    return res.status(200).json([]);
+  }
+});
+
+app.post("/api/sheets/update-modules", async (req: Request, res: Response) => {
+  try {
+    const payload = req.body || {};
+    if (!payload.secret) {
+      payload.secret = CLEVERA_SECRET_KEY;
+    }
+    if (!payload.sheet) {
+      payload.sheet = "Modules";
+    }
+    if (!payload.action) {
+      payload.action = "updateModules";
+    }
+
+    const fetchRes = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await fetchRes.text();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text, status: fetchRes.ok ? "success" : "error" };
+    }
+    return res.json(parsed);
+  } catch (error) {
+    console.error("[GOOGLE SHEETS PROXY] Update error:", error);
+    return res.status(500).json({ error: "Network error updating Google Sheets" });
+  }
+});
+
+// -------------------------------------------------------------
 // SEARCH ENGINE OPTIMIZATION (SEO) & SITEMAP SERVICES
 // -------------------------------------------------------------
 app.get("/sitemap.xml", (req: Request, res: Response) => {
