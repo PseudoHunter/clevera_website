@@ -176,6 +176,35 @@ export interface TrustedByConfig {
   layoutVariant: 'marquee' | 'grid' | 'carousel';
 }
 
+export interface HeroConfig {
+  badge: string;
+  title: string;
+  calendarNotice: string;
+  grantNotice: string;
+  primaryCtaText: string;
+  secondaryCtaText: string;
+  bgImageUrl: string;
+  metric1Value: string;
+  metric1Label: string;
+  metric2Value: string;
+  metric2Label: string;
+  metric3Value: string;
+  metric3Label: string;
+  metric4Value: string;
+  metric4Label: string;
+}
+
+export interface EditorialConfig {
+  title: string;
+  tag: string;
+  imageUrl: string;
+  paragraph1: string;
+  paragraph2: string;
+  primaryCta: string;
+  secondaryCta: string;
+  guaranteeText: string;
+}
+
 export interface SectionVisibility {
   // Home Page Sections
   hero: boolean;
@@ -195,6 +224,8 @@ export interface SectionVisibility {
 
 export type AdminContentSubTab = 
   | 'sections'
+  | 'hero'
+  | 'editorial'
   | 'modules' 
   | 'trainers' 
   | 'calculator' 
@@ -203,4 +234,22 @@ export type AdminContentSubTab =
   | 'contact' 
   | 'footer' 
   | 'announcement';
+
+export interface SiteContentPayload {
+  heroConfig?: HeroConfig;
+  editorialConfig?: EditorialConfig;
+  modules?: TrainingModule[];
+  trainers?: Trainer[];
+  calculatorConfig?: CalculatorConfig;
+  testimonials?: Testimonial[];
+  contactConfig?: ContactConfig;
+  footerConfig?: FooterConfig;
+  announcement?: SiteAnnouncement;
+  clientLogos?: ClientLogo[];
+  trustedByConfig?: TrustedByConfig;
+  sectionVisibility?: SectionVisibility;
+  logoConfig?: any;
+  lastUpdated?: string;
+  updatedBy?: string;
+}
 

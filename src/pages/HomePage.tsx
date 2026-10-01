@@ -18,22 +18,40 @@ import {
   Mail,
   Phone,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  Edit3
 } from 'lucide-react';
 
 interface HomePageProps {
   onNavigate: (route: PageRoute) => void;
   onOpenSyllabus: (module: TrainingModule) => void;
   onOpenEligibility: () => void;
+  isAdminLoggedIn?: boolean;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
   onOpenSyllabus,
   onOpenEligibility,
+  isAdminLoggedIn = false,
 }) => {
-  const { modules, trainers, testimonials, contactConfig, sectionVisibility } = useContent();
+  const { 
+    modules, 
+    trainers, 
+    testimonials, 
+    contactConfig, 
+    sectionVisibility, 
+    heroConfig, 
+    editorialConfig,
+    setAdminEditorTargetTab 
+  } = useContent();
+
   const [selectedTrainer, setSelectedTrainer] = useState<string | null>(null);
+
+  const handleQuickEdit = (tab: any) => {
+    setAdminEditorTargetTab(tab);
+    onNavigate('admin');
+  };
 
   // Lineup modules dynamically connected to live modules catalog
   const lineupModules = [
@@ -70,17 +88,31 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 1. HERO SECTION: Architectural Dark Facade + Bold Display Typography     */}
       {/* ========================================================================= */}
       {sectionVisibility.hero && (
-        <section id="home-hero-section" className="relative w-full min-h-[680px] lg:min-h-[760px] bg-slate-950 flex flex-col justify-center overflow-hidden">
+        <section id="home-hero-section" className="relative w-full min-h-[680px] lg:min-h-[760px] bg-slate-950 flex flex-col justify-center overflow-hidden group">
           {/* Background Architectural Facade with cinematic moody grading */}
           <div 
-            className="absolute inset-0 bg-cover bg-center opacity-45 mix-blend-luminosity scale-105"
+            className="absolute inset-0 bg-cover bg-center opacity-45 mix-blend-luminosity scale-105 transition-all duration-700"
             style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2200&auto=format&fit=crop')`,
+              backgroundImage: `url('${heroConfig.bgImageUrl || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2200&auto=format&fit=crop"}')`,
             }}
           />
           {/* Deep Slate / Black Vignette Overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/85 to-slate-950/70" />
           <div className="absolute inset-0 bg-radial-at-t from-transparent via-black/40 to-black/90 pointer-events-none" />
+
+          {/* Admin In-Context Edit Quick Button */}
+          {isAdminLoggedIn && (
+            <div className="absolute top-6 right-6 z-20">
+              <button
+                onClick={() => handleQuickEdit('hero')}
+                className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-md border border-blue-400/40 transition-all cursor-pointer hover:scale-105"
+                title="Edit Hero Headline, Subtitles, Background & Metrics"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Hero Section</span>
+              </button>
+            </div>
+          )}
 
           <div className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-28 z-10 w-full">
             <div className="max-w-3xl space-y-7">
@@ -88,36 +120,43 @@ export const HomePage: React.FC<HomePageProps> = ({
               {/* Main Headline (Clean, Massive, Sans Display) */}
               <div className="space-y-1">
                 <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black text-white tracking-tight leading-[0.95] font-display">
-                  Elevate<br />
-                  Workforce<br />
-                  Excellence
+                  {heroConfig.title ? (
+                    heroConfig.title.split('\n').map((line, idx) => (
+                      <React.Fragment key={idx}>
+                        {line}
+                        {idx < heroConfig.title.split('\n').length - 1 && <br />}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <>Elevate<br />Workforce<br />Excellence</>
+                  )}
                 </h1>
               </div>
 
               {/* Sub-header tracked uppercase badge */}
               <p className="text-xs sm:text-sm font-bold tracking-[0.25em] text-slate-300 uppercase">
-                MALAYSIA'S PREMIER HRD CORP APPROVED ACADEMY
+                {heroConfig.badge}
               </p>
 
               {/* Schedule & Grant metadata */}
               <div className="space-y-1.5 pt-2 text-slate-400 text-xs sm:text-sm font-medium tracking-wide">
                 <p className="text-white font-semibold flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#3430eb] animate-pulse inline-block" />
-                  2026 CORPORATE CALENDAR OPEN &bull; ON-SITE OR RESORT RETREAT
+                  {heroConfig.calendarNotice}
                 </p>
                 <p className="text-slate-300">
-                  100% SBL-KHAS GRANT CLAIMABLE &bull; ZERO OUT-OF-POCKET CASH
+                  {heroConfig.grantNotice}
                 </p>
               </div>
 
-              {/* Primary Action Button (Reference Cobalt Blue Pill) */}
+              {/* Primary Action Button */}
               <div className="pt-4 flex flex-wrap items-center gap-4">
                 <button
                   id="hero-register-btn"
                   onClick={() => onNavigate('contact-booking')}
                   className="btn-cobalt px-8 sm:px-10 py-4 text-xs sm:text-sm font-extrabold tracking-wider shadow-xl cursor-pointer"
                 >
-                  Request Proposal Now
+                  {heroConfig.primaryCtaText || 'Request Proposal Now'}
                 </button>
 
                 <button
@@ -125,7 +164,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => onNavigate('modules')}
                   className="px-7 py-3.5 rounded-full border border-white/30 text-white hover:bg-white/10 text-xs sm:text-sm font-bold tracking-wide uppercase transition-all cursor-pointer"
                 >
-                  Explore 10+ Modules
+                  {heroConfig.secondaryCtaText || 'Explore 10+ Modules'}
                 </button>
 
                 <button
@@ -140,20 +179,36 @@ export const HomePage: React.FC<HomePageProps> = ({
               {/* Floating Trust Metrics */}
               <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-white/10 max-w-2xl">
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-white font-display">250+</span>
-                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Clients Trained</span>
+                  <span className="text-2xl sm:text-3xl font-black text-white font-display">
+                    {heroConfig.metric1Value}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                    {heroConfig.metric1Label}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-[#60a5fa] font-display">RM4.8M+</span>
-                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Grants Disbursed</span>
+                  <span className="text-2xl sm:text-3xl font-black text-[#60a5fa] font-display">
+                    {heroConfig.metric2Value}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                    {heroConfig.metric2Label}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-white font-display">18.5K+</span>
-                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Professionals</span>
+                  <span className="text-2xl sm:text-3xl font-black text-white font-display">
+                    {heroConfig.metric3Value}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                    {heroConfig.metric3Label}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-display">98.4%</span>
-                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Approval Rate</span>
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-display">
+                    {heroConfig.metric4Value}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                    {heroConfig.metric4Label}
+                  </span>
                 </div>
               </div>
 
@@ -166,24 +221,51 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 1.5. TRUSTED BY CLIENT LOGOS CAROUSEL (Enterprise Social Proof)          */}
       {/* ========================================================================= */}
       {sectionVisibility.trustedBy && (
-        <TrustedBySection onNavigate={onNavigate} />
+        <div className="relative group">
+          {isAdminLoggedIn && (
+            <div className="absolute top-4 right-6 z-20">
+              <button
+                onClick={() => handleQuickEdit('trusted-by')}
+                className="bg-slate-900/90 hover:bg-slate-900 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3 text-blue-400" />
+                <span>Edit Logos</span>
+              </button>
+            </div>
+          )}
+          <TrustedBySection onNavigate={onNavigate} />
+        </div>
       )}
 
       {/* ========================================================================= */}
       {/* 2. SPLIT EDITORIAL SECTION: 50/50 B&W Workshop + Pitch Black Content      */}
       {/* ========================================================================= */}
       {sectionVisibility.splitEditorial && (
-        <section id="home-split-editorial-section" className="w-full grid grid-cols-1 lg:grid-cols-2 bg-black text-white overflow-hidden">
+        <section id="home-split-editorial-section" className="relative w-full grid grid-cols-1 lg:grid-cols-2 bg-black text-white overflow-hidden group">
+          {/* Admin In-Context Edit Quick Button */}
+          {isAdminLoggedIn && (
+            <div className="absolute top-6 right-6 z-20">
+              <button
+                onClick={() => handleQuickEdit('editorial')}
+                className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-md border border-blue-400/40 transition-all cursor-pointer hover:scale-105"
+                title="Edit Future Outlook Headline, Copy & Photo"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Editorial Section</span>
+              </button>
+            </div>
+          )}
+
           {/* Left 50%: High-contrast authentic workshop photography */}
           <div className="relative min-h-[420px] lg:min-h-[580px] bg-slate-900 overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1400&auto=format&fit=crop"
+              src={editorialConfig.imageUrl || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1400&auto=format&fit=crop"}
               alt="Corporate team collaboration and workshop session"
               className="w-full h-full object-cover grayscale contrast-125 hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent lg:hidden" />
             <div className="absolute bottom-4 left-6 bg-black/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-[11px] font-semibold text-slate-300">
-              Live Corporate Workshop &bull; Kuala Lumpur
+              {editorialConfig.tag}
             </div>
           </div>
 
@@ -191,17 +273,25 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="flex flex-col justify-center px-8 sm:px-14 lg:px-20 py-16 lg:py-24 bg-black space-y-6">
             <div className="space-y-2">
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.05] font-display">
-                Gearing up<br />
-                for the future
+                {editorialConfig.title ? (
+                  editorialConfig.title.split('\n').map((line, idx) => (
+                    <React.Fragment key={idx}>
+                      {line}
+                      {idx < editorialConfig.title.split('\n').length - 1 && <br />}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <>Gearing up<br />for the future</>
+                )}
               </h2>
             </div>
 
             <div className="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl">
               <p>
-                Clevera Academy is Malaysia's premier corporate training institution where organizations empower their workforce, eliminate departmental silos, and unlock measurable productivity dividends.
+                {editorialConfig.paragraph1}
               </p>
               <p className="text-slate-400 text-sm leading-relaxed">
-                This year, we're focusing on future-readiness. Corporate dynamics are evolving rapidly across ASEAN, and Malaysian enterprises must elevate their leadership resilience, frontline retail agility, and AI workflow automation to rise to the challenges of tomorrow.
+                {editorialConfig.paragraph2}
               </p>
             </div>
 
@@ -210,13 +300,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 onClick={() => onNavigate('modules')}
                 className="btn-cobalt px-8 py-3.5 text-xs font-extrabold tracking-wider shadow-lg cursor-pointer"
               >
-                See More Modules
+                {editorialConfig.primaryCta || 'See More Modules'}
               </button>
               <button
                 onClick={() => onNavigate('gallery-about')}
                 className="text-xs font-bold text-slate-300 hover:text-white uppercase tracking-wider transition-colors px-4 py-3"
               >
-                About Faculty &rarr;
+                {editorialConfig.secondaryCta || 'About Faculty →'}
               </button>
             </div>
 
@@ -224,7 +314,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="pt-6 border-t border-white/10 flex items-center gap-3 text-xs text-slate-400">
               <ShieldCheck className="w-5 h-5 text-[#3430eb] shrink-0" />
               <span>
-                100% claimable under the HRD Corp SBL-Khas scheme. Employer makes zero upfront cash outlay.
+                {editorialConfig.guaranteeText}
               </span>
             </div>
           </div>
@@ -235,7 +325,20 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 3. ACTIVITY LINEUP: Clean White Background + Faint Large Numbers 01-04    */}
       {/* ========================================================================= */}
       {sectionVisibility.activityLineup && (
-        <section id="home-activity-lineup-section" className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-28 bg-white">
+        <section id="home-activity-lineup-section" className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-28 bg-white group">
+          {/* Admin In-Context Edit Quick Button */}
+          {isAdminLoggedIn && (
+            <div className="absolute top-8 right-8 z-10">
+              <button
+                onClick={() => handleQuickEdit('modules')}
+                className="bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Edit Modules Catalog</span>
+              </button>
+            </div>
+          )}
+
           {/* Section Header */}
           <div className="mb-14">
             <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight font-display">
@@ -249,10 +352,10 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* 4-Column Card Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {lineupModules.map((item) => (
-              <div key={item.num} className="flex flex-col group">
+              <div key={item.num} className="flex flex-col group/card">
                 
                 {/* Large Faint Number Header */}
-                <div className="text-5xl sm:text-6xl font-black text-slate-200 select-none leading-none mb-3 font-display transition-colors group-hover:text-slate-300">
+                <div className="text-5xl sm:text-6xl font-black text-slate-200 select-none leading-none mb-3 font-display transition-colors group-hover/card:text-slate-300">
                   {item.num}
                 </div>
 
@@ -261,7 +364,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <img
                     src={item.module.image || item.defaultImage}
                     alt={item.module.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
                     loading="lazy"
                   />
                   <span className="absolute bottom-2.5 right-2.5 bg-black/80 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
@@ -275,7 +378,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
 
                 {/* Title */}
-                <h3 className="text-base font-bold text-slate-900 leading-snug mb-2 line-clamp-2 group-hover:text-[#3430eb] transition-colors">
+                <h3 className="text-base font-bold text-slate-900 leading-snug mb-2 line-clamp-2 group-hover/card:text-[#3430eb] transition-colors">
                   {item.module.title}
                 </h3>
 
@@ -323,8 +426,20 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 4. FACULTY & SPEAKERS: Pitch Black Banner + Vertical Monochrome Columns    */}
       {/* ========================================================================= */}
       {sectionVisibility.faculty && (
-        <section id="home-faculty-section" className="w-full bg-black text-white py-16 lg:py-24">
-          
+        <section id="home-faculty-section" className="relative w-full bg-black text-white py-16 lg:py-24 group">
+          {/* Admin In-Context Edit Quick Button */}
+          {isAdminLoggedIn && (
+            <div className="absolute top-8 right-8 z-10">
+              <button
+                onClick={() => handleQuickEdit('trainers')}
+                className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow border border-blue-400/30 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Faculty / Trainers</span>
+              </button>
+            </div>
+          )}
+
           {/* Full-width Centered Title Bar */}
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 text-center mb-12">
             <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight font-display">
@@ -342,18 +457,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div 
                   key={trainer.id}
                   onClick={() => setSelectedTrainer(selectedTrainer === trainer.id ? null : trainer.id)}
-                  className="relative aspect-[3/4] sm:aspect-[9/14] rounded-2xl overflow-hidden bg-slate-900 group cursor-pointer border border-white/10"
+                  className="relative aspect-[3/4] sm:aspect-[9/14] rounded-2xl overflow-hidden bg-slate-900 group/trainer cursor-pointer border border-white/10"
                 >
-                  {/* Trainer Photo (Monochrome / High Contrast Grade) */}
+                  {/* Trainer Photo */}
                   <img
                     src={trainer.photoUrl}
                     alt={trainer.name}
-                    className="w-full h-full object-cover grayscale contrast-125 group-hover:scale-105 group-hover:grayscale-0 transition-all duration-500"
+                    className="w-full h-full object-cover grayscale contrast-125 group-hover/trainer:scale-105 group-hover/trainer:grayscale-0 transition-all duration-500"
                     loading="lazy"
                   />
 
-                  {/* Dark Gradient Overlay for Readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 group-hover:opacity-95 transition-opacity" />
+                  {/* Dark Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 group-hover/trainer:opacity-95 transition-opacity" />
 
                   {/* Trainer Info Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 p-6 space-y-2 text-left">
@@ -385,7 +500,18 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 5. INTERACTIVE HRDC GRANT & ROI CALCULATOR (Admin Toggleable)             */}
       {/* ========================================================================= */}
       {sectionVisibility.hrdcCalculator && (
-        <section id="home-calculator-section" className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-24 bg-slate-50 border-y border-slate-200">
+        <section id="home-calculator-section" className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-24 bg-slate-50 border-y border-slate-200 group">
+          {isAdminLoggedIn && (
+            <div className="absolute top-6 right-8 z-10">
+              <button
+                onClick={() => handleQuickEdit('calculator')}
+                className="bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Edit Calculator Settings</span>
+              </button>
+            </div>
+          )}
           <div className="max-w-3xl mx-auto text-center mb-10">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#3430eb] block mb-1">
               Statutory Malaysian Levy Optimization
@@ -405,7 +531,19 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 6. CORPORATE TESTIMONIALS & TRUST AUDIT                                   */}
       {/* ========================================================================= */}
       {sectionVisibility.testimonials && (
-        <section id="home-testimonials-section" className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-24 bg-white">
+        <section id="home-testimonials-section" className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 lg:py-24 bg-white group">
+          {isAdminLoggedIn && (
+            <div className="absolute top-6 right-8 z-10">
+              <button
+                onClick={() => handleQuickEdit('testimonials')}
+                className="bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Edit Testimonials</span>
+              </button>
+            </div>
+          )}
+
           <div className="max-w-2xl mx-auto text-center mb-14">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#3430eb] block mb-1">
               Proven Industry Track Record
@@ -456,8 +594,19 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* 7. SPLIT REACH OUT + ARCHITECTURAL GLASS SKYLIGHT CALL TO ACTION          */}
       {/* ========================================================================= */}
       {sectionVisibility.reachOut && (
-        <section id="home-reach-out-section" className="w-full grid grid-cols-1 lg:grid-cols-2 border-t border-slate-200 bg-white">
-          
+        <section id="home-reach-out-section" className="relative w-full grid grid-cols-1 lg:grid-cols-2 border-t border-slate-200 bg-white group">
+          {isAdminLoggedIn && (
+            <div className="absolute top-6 right-8 z-20">
+              <button
+                onClick={() => handleQuickEdit('contact')}
+                className="bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Edit Contact Details</span>
+              </button>
+            </div>
+          )}
+
           {/* Left 50%: Clean Stark White "Reach out" Section */}
           <div className="flex flex-col justify-center px-8 sm:px-14 lg:px-20 py-16 lg:py-24 bg-white space-y-8">
             <div>

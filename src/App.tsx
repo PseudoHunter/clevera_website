@@ -10,6 +10,7 @@ import { CookieBanner } from './components/CookieBanner';
 import { SyllabusModal } from './components/SyllabusModal';
 import { EligibilityCheckerModal } from './components/EligibilityCheckerModal';
 import { MetaTagsModal } from './components/MetaTagsModal';
+import { AdminQuickBar } from './components/AdminQuickBar';
 
 // Pages
 import { HomePage } from './pages/HomePage';
@@ -85,6 +86,15 @@ const AppInner: React.FC<AppInnerProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-[#3430eb] selection:text-white">
+      {/* 0. Admin Live Persistence & Multi-Server Bar */}
+      {isAdminLoggedIn && (
+        <AdminQuickBar
+          onNavigate={handleNavigate}
+          adminUser={adminUser}
+          currentRoute={currentRoute}
+        />
+      )}
+
       {/* 1. Top Site-wide Announcement Bar */}
       {sectionVisibility.announcementBar && announcement.active && (
         <div className="bg-slate-950 text-white text-xs py-2 px-4 text-center border-b border-slate-800 flex items-center justify-center gap-2 flex-wrap">
@@ -424,6 +434,7 @@ export default function App() {
             onNavigate={handleNavigate}
             onOpenSyllabus={(module) => setSelectedSyllabus(module)}
             onOpenEligibility={() => setIsEligibilityOpen(true)}
+            isAdminLoggedIn={isAdminLoggedIn}
           />
         );
       case 'modules':

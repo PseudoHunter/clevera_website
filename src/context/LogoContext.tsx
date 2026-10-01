@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { updateSectionOnServer } from '../services/siteContentService';
 
 export type LogoMode = 'official' | 'custom-image' | 'custom-vector';
 
@@ -83,13 +84,35 @@ export const LogoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [logoConfig]);
 
+  // Synchronize with multi-server content sync event
+  useEffect(() => {
+    const handleLogoSync = (e: Event) => {
+      const customEvent = e as CustomEvent<LogoConfig>;
+      if (customEvent.detail && typeof customEvent.detail === 'object') {
+        setLogoConfig((prev) => ({
+          ...prev,
+          ...customEvent.detail,
+        }));
+      }
+    };
+
+    window.addEventListener('clevera:logo-sync', handleLogoSync);
+    return () => {
+      window.removeEventListener('clevera:logo-sync', handleLogoSync);
+    };
+  }, []);
+
   const updateLogoConfig = (updates: Partial<LogoConfig>) => {
-    setLogoConfig((prev) => ({
-      ...prev,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'Admin (alifhakimi1704@gmail.com)',
-    }));
+    setLogoConfig((prev) => {
+      const next = {
+        ...prev,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'Admin (alifhakimi1704@gmail.com)',
+      };
+      updateSectionOnServer('logoConfig', next);
+      return next;
+    });
   };
 
   const saveLogoConfig = (newConfig: LogoConfig) => {
@@ -102,6 +125,7 @@ export const LogoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (typeof window !== 'undefined') {
       localStorage.setItem('clevera_admin_logo_config', JSON.stringify(finalConfig));
     }
+    updateSectionOnServer('logoConfig', finalConfig);
   };
 
   const uploadCustomLogoImage = (file: File): Promise<string> => {

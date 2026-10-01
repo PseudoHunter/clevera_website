@@ -4,9 +4,11 @@ import {
   TrainingModule, 
   Trainer, 
   Testimonial, 
-  ModuleCategory,
-  ClientLogo,
-  TrustedByConfig
+  ModuleCategory, 
+  ClientLogo, 
+  TrustedByConfig,
+  HeroConfig,
+  EditorialConfig
 } from '../types';
 import { useContent } from '../context/ContentContext';
 import { generateLogoPlaceholder } from '../data/clientLogosData';
@@ -41,7 +43,9 @@ import {
   Loader2,
   CloudUpload,
   FileSpreadsheet,
-  RefreshCw
+  RefreshCw,
+  Globe,
+  UploadCloud
 } from 'lucide-react';
 
 interface AdminContentEditorProps {
@@ -102,6 +106,14 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
     resetClientLogos,
     resetTrustedByConfig,
 
+    heroConfig,
+    updateHeroConfig,
+    resetHeroConfig,
+
+    editorialConfig,
+    updateEditorialConfig,
+    resetEditorialConfig,
+
     sectionVisibility,
     updateSectionVisibility,
     toggleSectionVisibility,
@@ -110,6 +122,12 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
     resetAllContent,
     adminEditorTargetTab,
     setAdminEditorTargetTab,
+
+    isServerSyncing,
+    isPublishingToServer,
+    lastServerSyncTime,
+    publishAllToServer,
+    refreshFromServer,
 
     isSheetsLoading,
     isPublishingToSheets,
@@ -121,20 +139,52 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
   const [activeSubTab, setActiveSubTab] = useState<AdminContentSubTab>(adminEditorTargetTab || initialTab);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Form states for Hero & Editorial
+  const [heroForm, setHeroForm] = useState<HeroConfig>(heroConfig);
+  const [editorialForm, setEditorialForm] = useState<EditorialConfig>(editorialConfig);
+
+  React.useEffect(() => {
+    setHeroForm(heroConfig);
+  }, [heroConfig]);
+
+  React.useEffect(() => {
+    setEditorialForm(editorialConfig);
+  }, [editorialConfig]);
+
+  const handlePublishAllToServer = async () => {
+    try {
+      const result = await publishAllToServer();
+      setToastMessage(result.message);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      setToastMessage(`Error: ${err?.message || 'Failed to publish to server'}`);
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+  };
+
+  const handleRefreshFromServer = async () => {
+    const success = await refreshFromServer();
+    if (success) {
+      setToastMessage('Successfully synchronized site content from server disk!');
+    } else {
+      setToastMessage('Could not fetch from server; using cached content.');
+    }
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const handlePublishToGoogleSheets = async () => {
     try {
       const result = await publishModulesToSheets();
       if (result.success) {
-        window.alert(result.message || 'All module catalog updates have been published to Google Sheets successfully!');
-        setToastMessage('Published module updates to Google Sheets successfully!');
+        setToastMessage(result.message || 'All module catalog updates have been published to Google Sheets successfully!');
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        window.alert(`Error publishing to Google Sheets: ${result.message}`);
         setToastMessage(`Failed to publish: ${result.message}`);
         setTimeout(() => setToastMessage(null), 5000);
       }
     } catch (err: any) {
-      window.alert(`Unexpected error: ${err?.message || 'Failed to publish to Google Sheets'}`);
+      setToastMessage(`Error: ${err?.message || 'Failed to publish to Google Sheets'}`);
+      setTimeout(() => setToastMessage(null), 5000);
     }
   };
 
@@ -213,6 +263,8 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
 
   const navTabs = [
     { id: 'sections' as AdminContentSubTab, label: 'Section Visibility', icon: Eye, count: `${visibleCount}/${totalSectionsCount}` },
+    { id: 'hero' as AdminContentSubTab, label: 'Hero Section', icon: Sparkles },
+    { id: 'editorial' as AdminContentSubTab, label: 'Future Outlook (Editorial)', icon: Sliders },
     { id: 'modules' as AdminContentSubTab, label: '1. Training Modules', icon: BookOpen, count: modules.length },
     { id: 'trainers' as AdminContentSubTab, label: '2. Trainers & Faculty', icon: Users, count: trainers.length },
     { id: 'calculator' as AdminContentSubTab, label: '3. HRDC Calculator Logic', icon: Calculator },
@@ -261,6 +313,67 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset All Defaults</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Multi-Server Live Persistence & Synchronization Banner */}
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 border border-blue-800/60 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-400 flex items-center justify-center shrink-0 shadow-inner">
+            <Globe className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                Multi-Server Live Persistence Engine
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Server Disk Active
+              </span>
+              {lastServerSyncTime && (
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                  Last Synced: {lastServerSyncTime}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+              Changes saved in any section are written directly to the server disk (<code className="text-blue-300 font-mono text-[11px]">/data/site-content.json</code>) and immediately served to all visitors, other devices, and remote servers in real-time.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <button
+            type="button"
+            onClick={handleRefreshFromServer}
+            disabled={isServerSyncing}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-bold text-slate-200 rounded-xl transition-all border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+            title="Fetch the latest content stored on the live server disk"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isServerSyncing ? 'animate-spin text-blue-400' : 'text-slate-400'}`} />
+            <span>{isServerSyncing ? 'Syncing...' : 'Pull Live Server'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePublishAllToServer}
+            disabled={isPublishingToServer}
+            className="px-4 py-2 bg-[#3430eb] hover:bg-blue-600 disabled:opacity-50 text-xs font-extrabold text-white rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer hover:scale-102 active:scale-98"
+            title="Publish all active sections and items live to the persistent server"
+          >
+            {isPublishingToServer ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Publishing to All Servers...</span>
+              </>
+            ) : (
+              <>
+                <UploadCloud className="w-4 h-4" />
+                <span>Publish All Live to Servers</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -907,6 +1020,490 @@ export const AdminContentEditor: React.FC<AdminContentEditorProps> = ({ initialT
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 0.1. HERO SECTION SUBTAB                                                  */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'hero' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1 max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Top-Fold Hero Experience</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-display">
+                Hero Section Headline, Badges, CTAs & Metrics
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Edit the massive architectural facade headline, 2026 intake notices, background photograph, and floating trust statistics. Changes update live across all servers upon saving.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetHeroConfig();
+                  showToast('Hero section restored to factory default.');
+                }}
+                className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Hero</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateHeroConfig(heroForm);
+                  showToast('Hero section saved and broadcast to all servers!');
+                }}
+                className="btn-cobalt px-5 py-2.5 text-xs font-extrabold tracking-wider shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Hero Changes</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Form Fields (2 Cols) */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Main Headline (Use Line Breaks for Multi-Line Stacking)
+                </label>
+                <textarea
+                  rows={3}
+                  value={heroForm.title}
+                  onChange={(e) => setHeroForm({ ...heroForm, title: e.target.value })}
+                  placeholder="Elevate&#10;Workforce&#10;Excellence"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-slate-900 text-sm font-black focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Tip: Each line in this box appears on its own line in the hero display header.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Tracked Sub-Header Accreditation Badge
+                </label>
+                <input
+                  type="text"
+                  value={heroForm.badge}
+                  onChange={(e) => setHeroForm({ ...heroForm, badge: e.target.value })}
+                  placeholder="MALAYSIA'S PREMIER HRD CORP APPROVED ACADEMY"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Intake / Calendar Notice
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.calendarNotice}
+                    onChange={(e) => setHeroForm({ ...heroForm, calendarNotice: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Grant / Reimbursement Notice
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.grantNotice}
+                    onChange={(e) => setHeroForm({ ...heroForm, grantNotice: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Primary CTA Button Label
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.primaryCtaText}
+                    onChange={(e) => setHeroForm({ ...heroForm, primaryCtaText: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Secondary CTA Button Label
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.secondaryCtaText}
+                    onChange={(e) => setHeroForm({ ...heroForm, secondaryCtaText: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Architectural Facade Background Photo URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={heroForm.bgImageUrl}
+                    onChange={(e) => setHeroForm({ ...heroForm, bgImageUrl: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    placeholder="https://images.unsplash.com/..."
+                  />
+                </div>
+              </div>
+
+              {/* 4 Trust Metrics */}
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">
+                  4 Floating Trust Metrics Cards
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Metric 1</span>
+                    <input
+                      type="text"
+                      value={heroForm.metric1Value}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric1Value: e.target.value })}
+                      className="w-full font-black text-slate-900 text-sm mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.metric1Label}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric1Label: e.target.value })}
+                      className="w-full text-slate-600 text-xs mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Metric 2</span>
+                    <input
+                      type="text"
+                      value={heroForm.metric2Value}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric2Value: e.target.value })}
+                      className="w-full font-black text-blue-600 text-sm mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.metric2Label}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric2Label: e.target.value })}
+                      className="w-full text-slate-600 text-xs mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Metric 3</span>
+                    <input
+                      type="text"
+                      value={heroForm.metric3Value}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric3Value: e.target.value })}
+                      className="w-full font-black text-slate-900 text-sm mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.metric3Label}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric3Label: e.target.value })}
+                      className="w-full text-slate-600 text-xs mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Metric 4</span>
+                    <input
+                      type="text"
+                      value={heroForm.metric4Value}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric4Value: e.target.value })}
+                      className="w-full font-black text-emerald-600 text-sm mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.metric4Label}
+                      onChange={(e) => setHeroForm({ ...heroForm, metric4Label: e.target.value })}
+                      className="w-full text-slate-600 text-xs mt-1 bg-white border border-slate-300 rounded px-2 py-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateHeroConfig(heroForm);
+                    showToast('Hero section saved and broadcast to all servers!');
+                  }}
+                  className="btn-cobalt px-6 py-3 text-xs font-extrabold tracking-wider shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save All Hero Edits</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Visual Preview Card (1 Col) */}
+            <div className="bg-slate-950 text-white rounded-2xl border border-slate-800 p-6 shadow-md flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Live Hero Mockup Preview
+                  </span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-400/30">
+                    Realtime
+                  </span>
+                </div>
+
+                <div className="relative aspect-[16/10] rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+                  <img
+                    src={heroForm.bgImageUrl || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2200&auto=format&fit=crop"}
+                    alt="Hero Preview"
+                    className="w-full h-full object-cover opacity-60 mix-blend-luminosity"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent p-4 flex flex-col justify-end">
+                    <span className="text-[9px] font-bold text-blue-400 tracking-wider uppercase mb-1">
+                      {heroForm.badge}
+                    </span>
+                    <h5 className="text-sm font-black text-white leading-tight">
+                      {heroForm.title.split('\n')[0] || 'Elevate Workforce'}
+                    </h5>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Intake:</span>
+                    <span className="text-white text-right truncate max-w-[180px]">{heroForm.calendarNotice}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Grant:</span>
+                    <span className="text-emerald-400 text-right truncate max-w-[180px]">{heroForm.grantNotice}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>CTA:</span>
+                    <span className="text-blue-300 font-bold">{heroForm.primaryCtaText}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 text-center">
+                <span className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Synchronized to Multi-Server Disk</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 0.2. EDITORIAL / FUTURE OUTLOOK SUBTAB                                    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'editorial' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1 max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                <Sliders className="w-3.5 h-3.5 text-blue-600" />
+                <span>Split Editorial Storytelling</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-display">
+                Future Outlook Section ("Gearing Up For The Future")
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Control the 50/50 split workshop section: headline, corporate narrative, high-contrast B&W photo, and SBL-Khas guarantee notices.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetEditorialConfig();
+                  showToast('Editorial section restored to factory default.');
+                }}
+                className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Editorial</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateEditorialConfig(editorialForm);
+                  showToast('Editorial section saved and broadcast to all servers!');
+                }}
+                className="btn-cobalt px-5 py-2.5 text-xs font-extrabold tracking-wider shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Editorial Changes</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Section Title
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editorialForm.title}
+                    onChange={(e) => setEditorialForm({ ...editorialForm, title: e.target.value })}
+                    placeholder="Gearing up&#10;for the future"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 text-sm font-black focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Workshop Photo Location Badge
+                  </label>
+                  <input
+                    type="text"
+                    value={editorialForm.tag}
+                    onChange={(e) => setEditorialForm({ ...editorialForm, tag: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-3 text-slate-900 text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Workshop Photo URL (Authentic Team Building or Training Session)
+                </label>
+                <input
+                  type="url"
+                  value={editorialForm.imageUrl}
+                  onChange={(e) => setEditorialForm({ ...editorialForm, imageUrl: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Primary Paragraph (Company Mission & Impact)
+                </label>
+                <textarea
+                  rows={3}
+                  value={editorialForm.paragraph1}
+                  onChange={(e) => setEditorialForm({ ...editorialForm, paragraph1: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-slate-900 text-xs sm:text-sm leading-relaxed focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Secondary Paragraph (Future-Readiness Focus)
+                </label>
+                <textarea
+                  rows={3}
+                  value={editorialForm.paragraph2}
+                  onChange={(e) => setEditorialForm({ ...editorialForm, paragraph2: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-slate-900 text-xs sm:text-sm leading-relaxed focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Primary Button Text
+                  </label>
+                  <input
+                    type="text"
+                    value={editorialForm.primaryCta}
+                    onChange={(e) => setEditorialForm({ ...editorialForm, primaryCta: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                    Secondary Link Text
+                  </label>
+                  <input
+                    type="text"
+                    value={editorialForm.secondaryCta}
+                    onChange={(e) => setEditorialForm({ ...editorialForm, secondaryCta: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  HRDC SBL-Khas Guarantee Notice
+                </label>
+                <input
+                  type="text"
+                  value={editorialForm.guaranteeText}
+                  onChange={(e) => setEditorialForm({ ...editorialForm, guaranteeText: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs font-medium focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateEditorialConfig(editorialForm);
+                    showToast('Future Outlook / Editorial section saved and broadcast to all servers!');
+                  }}
+                  className="btn-cobalt px-6 py-3 text-xs font-extrabold tracking-wider shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Editorial Edits</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Visual Photo Card Preview */}
+            <div className="bg-black text-white rounded-2xl border border-slate-800 p-6 shadow-md flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block border-b border-white/10 pb-3">
+                  Editorial Photography Preview
+                </span>
+
+                <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/10 bg-slate-900">
+                  <img
+                    src={editorialForm.imageUrl || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1400&auto=format&fit=crop"}
+                    alt="Editorial Workshop"
+                    className="w-full h-full object-cover grayscale contrast-125"
+                  />
+                  <div className="absolute bottom-3 left-3 bg-black/80 px-2.5 py-1 rounded-full text-[10px] text-slate-300 border border-white/20">
+                    {editorialForm.tag}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-950 rounded-xl border border-slate-900 space-y-2">
+                  <h5 className="font-black text-white text-base leading-snug font-display">
+                    {editorialForm.title}
+                  </h5>
+                  <p className="text-xs text-slate-400 line-clamp-3">
+                    {editorialForm.paragraph1}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 text-center">
+                <span className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Persisted to Server Disk & All Devices</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

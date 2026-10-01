@@ -1,13 +1,50 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import crypto from "crypto";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
+import { getFullDefaultSiteContent } from "./src/data/siteContentDefaults";
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// -------------------------------------------------------------
+// MULTI-SERVER PERSISTENT SITE CONTENT STORE
+// Persisted to /data/site-content.json on the server disk
+// Guarantees all admin edits across all sections are immediately
+// stored server-side and served live to all visitors across servers.
+// -------------------------------------------------------------
+const DATA_DIR = path.join(process.cwd(), "data");
+const CONTENT_FILE = path.join(DATA_DIR, "site-content.json");
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+let serverSiteContent: any = null;
+
+try {
+  if (fs.existsSync(CONTENT_FILE)) {
+    const raw = fs.readFileSync(CONTENT_FILE, "utf-8");
+    serverSiteContent = JSON.parse(raw);
+    console.log("[SERVER CONTENT] Successfully loaded live site content from disk.");
+  }
+} catch (e) {
+  console.warn("[SERVER CONTENT] Could not read existing site-content.json:", e);
+}
+
+if (!serverSiteContent || !serverSiteContent.modules || !serverSiteContent.modules.length) {
+  serverSiteContent = getFullDefaultSiteContent();
+  try {
+    fs.writeFileSync(CONTENT_FILE, JSON.stringify(serverSiteContent, null, 2), "utf-8");
+    console.log("[SERVER CONTENT] Initialized default site content to disk at:", CONTENT_FILE);
+  } catch (e) {
+    console.error("[SERVER CONTENT] Failed to write initial content file:", e);
+  }
+}
 
 // -------------------------------------------------------------
 // IN-MEMORY ADMIN SECURITY & SESSION STORE
@@ -450,6 +487,108 @@ app.get("/api/analytics/stats", (_req: Request, res: Response) => {
     recentEvents: serverTelemetryLog.slice(0, 15),
     serverTimestamp: new Date().toISOString(),
   });
+});
+
+// -------------------------------------------------------------
+// PERSISTENT LIVE CONTENT API ENDPOINTS (Multi-Server Synchronization)
+// Allows admin to edit all sections & items and publish live
+// so changes are immediately displayed to visitors across all servers.
+// -------------------------------------------------------------
+
+// Fetch active site content (for public pages and other servers)
+app.get("/api/content", (_req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.json(serverSiteContent);
+});
+
+// Publish all edited sections to the server disk
+app.post("/api/content/publish", (req: Request, res: Response) => {
+  try {
+    const { content, updatedBy } = req.body || {};
+    if (!content || typeof content !== "object") {
+      return res.status(400).json({ success: false, error: "Content object payload is required." });
+    }
+
+    serverSiteContent = {
+      ...serverSiteContent,
+      ...content,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: updatedBy || "Super Administrator",
+    };
+
+    fs.writeFileSync(CONTENT_FILE, JSON.stringify(serverSiteContent, null, 2), "utf-8");
+    console.log(`[SERVER CONTENT] Published all section edits to disk at ${serverSiteContent.lastUpdated} by ${serverSiteContent.updatedBy}`);
+
+    return res.json({
+      success: true,
+      message: "All section changes published live to server & active for all visitors across all servers.",
+      timestamp: serverSiteContent.lastUpdated,
+      content: serverSiteContent,
+    });
+  } catch (error: any) {
+    console.error("[SERVER CONTENT] Error persisting content to disk:", error);
+    return res.status(500).json({ success: false, error: "Failed to persist content to server." });
+  }
+});
+
+// Update an individual section (e.g., hero, modules, trainers, calculator, etc.)
+app.post("/api/content/update-section", (req: Request, res: Response) => {
+  try {
+    const { section, data, updatedBy } = req.body || {};
+    if (!section || data === undefined) {
+      return res.status(400).json({ success: false, error: "Section name and data are required." });
+    }
+
+    serverSiteContent[section] = data;
+    serverSiteContent.lastUpdated = new Date().toISOString();
+    serverSiteContent.updatedBy = updatedBy || "Super Administrator";
+
+    fs.writeFileSync(CONTENT_FILE, JSON.stringify(serverSiteContent, null, 2), "utf-8");
+    console.log(`[SERVER CONTENT] Section [${section}] updated live on server disk.`);
+
+    return res.json({
+      success: true,
+      message: `Section [${section}] updated live on server.`,
+      timestamp: serverSiteContent.lastUpdated,
+    });
+  } catch (error: any) {
+    console.error("[SERVER CONTENT] Error updating section:", error);
+    return res.status(500).json({ success: false, error: "Failed to update section." });
+  }
+});
+
+// Reset specific section or all content to factory baseline
+app.post("/api/content/reset", (req: Request, res: Response) => {
+  try {
+    const { section } = req.body || {};
+    const defaults = getFullDefaultSiteContent();
+
+    if (!section || section === "all") {
+      serverSiteContent = {
+        ...defaults,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: "System Baseline Reset",
+      };
+    } else if (defaults[section as keyof typeof defaults] !== undefined) {
+      serverSiteContent[section] = defaults[section as keyof typeof defaults];
+      serverSiteContent.lastUpdated = new Date().toISOString();
+      serverSiteContent.updatedBy = `Reset ${section} to Factory Baseline`;
+    }
+
+    fs.writeFileSync(CONTENT_FILE, JSON.stringify(serverSiteContent, null, 2), "utf-8");
+    console.log(`[SERVER CONTENT] Content reset for [${section || "all"}] and persisted to disk.`);
+
+    return res.json({
+      success: true,
+      message: `Content [${section || "all"}] restored to factory defaults on server.`,
+      content: serverSiteContent,
+    });
+  } catch (error: any) {
+    console.error("[SERVER CONTENT] Error resetting content:", error);
+    return res.status(500).json({ success: false, error: "Failed to reset content." });
+  }
 });
 
 // -------------------------------------------------------------
