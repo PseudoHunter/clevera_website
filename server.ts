@@ -595,7 +595,7 @@ app.post("/api/content/reset", (req: Request, res: Response) => {
 // GOOGLE SHEETS LIVE DATABASE INTEGRATION PROXY
 // -------------------------------------------------------------
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMBsOnsNY0bpL_vSr_UEzZvVSgSxXCHsN9-oTHJa7kNYXj4aUe_EQXqchqHLu0D5JT/exec";
-const CLEVERA_SECRET_KEY = process.env.secret;
+const CLEVERA_SECRET_KEY = process.env.secret || "CLEVERA_SECRET_KEY_2026";
 
 app.get("/api/sheets/modules", async (_req: Request, res: Response) => {
   try {
